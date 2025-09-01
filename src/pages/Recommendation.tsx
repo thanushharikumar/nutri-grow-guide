@@ -16,6 +16,7 @@ import { Loader2, Upload, Camera, MapPin, Brain, Leaf } from "lucide-react";
 import { getWeatherData, getUserLocation, WeatherData } from "@/services/weatherService";
 import { analyzeCropImage, CropAnalysisResult } from "@/services/cropAnalysisService";
 import { generateRecommendation, RecommendationResult, SoilData } from "@/services/recommendationEngine";
+import { getSoilHealthData, SoilHealthData } from "@/services/soilHealthService";
 
 const formSchema = z.object({
   soilType: z.enum(["sandy", "loamy", "clayey", "silty"], {
@@ -41,6 +42,8 @@ const Recommendation = () => {
   const [cropAnalysis, setCropAnalysis] = useState<CropAnalysisResult | null>(null);
   const [cropImage, setCropImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [soilHealthData, setSoilHealthData] = useState<SoilHealthData | null>(null);
+  const [isLoadingSoilData, setIsLoadingSoilData] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -53,6 +56,42 @@ const Recommendation = () => {
       organicCarbon: 1.2,
     },
   });
+
+  const fetchSoilData = async () => {
+    setIsLoadingSoilData(true);
+    try {
+      toast({
+        title: "Fetching soil data...",
+        description: "Getting soil health card data for your location",
+      });
+
+      const coordinates = await getUserLocation();
+      const soilData = await getSoilHealthData(coordinates);
+      setSoilHealthData(soilData);
+      
+      // Auto-populate form with soil health card data
+      form.setValue('soilType', soilData.soilType);
+      form.setValue('pH', soilData.pH);
+      form.setValue('nitrogen', soilData.nitrogen);
+      form.setValue('phosphorus', soilData.phosphorus);
+      form.setValue('potassium', soilData.potassium);
+      form.setValue('organicCarbon', soilData.organicCarbon);
+
+      toast({
+        title: "Soil data loaded!",
+        description: `Found soil health card: ${soilData.cardNumber}`,
+      });
+    } catch (error) {
+      console.error('Error fetching soil data:', error);
+      toast({
+        title: "Soil data unavailable",
+        description: "Please enter soil values manually or try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingSoilData(false);
+    }
+  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -368,10 +407,34 @@ const Recommendation = () => {
             {/* Soil Analysis */}
             <Card className="shadow-soft">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2 text-card-foreground">
-                  <MapPin className="h-6 w-6 text-earth" />
-                  <span>Soil Analysis Data</span>
+                <CardTitle className="flex items-center justify-between text-card-foreground">
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="h-6 w-6 text-earth" />
+                    <span>Soil Analysis Data</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchSoilData}
+                    disabled={isLoadingSoilData || isLoading}
+                    className="ml-auto"
+                  >
+                    {isLoadingSoilData ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <MapPin className="h-4 w-4 mr-2" />
+                    )}
+                    {isLoadingSoilData ? "Loading..." : "Get Soil Data"}
+                  </Button>
                 </CardTitle>
+                {soilHealthData && (
+                  <div className="text-sm text-muted-foreground">
+                    <p>✅ Soil Health Card: {soilHealthData.cardNumber}</p>
+                    <p>📍 Location: {soilHealthData.location}</p>
+                    <p>📅 Last Updated: {soilHealthData.lastUpdated.toLocaleDateString()}</p>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
