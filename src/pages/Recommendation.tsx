@@ -412,24 +412,26 @@ const Recommendation = () => {
                     <MapPin className="h-6 w-6 text-earth" />
                     <span>Soil Analysis Data</span>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={fetchSoilData}
-                    disabled={isLoadingSoilData || isLoading}
-                    className="ml-auto"
-                  >
-                    {isLoadingSoilData ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <MapPin className="h-4 w-4 mr-2" />
-                    )}
-                    {isLoadingSoilData ? "Loading..." : "Get Soil Data"}
-                  </Button>
+                  {!soilHealthData && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchSoilData}
+                      disabled={isLoadingSoilData || isLoading}
+                      className="ml-auto"
+                    >
+                      {isLoadingSoilData ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <MapPin className="h-4 w-4 mr-2" />
+                      )}
+                      {isLoadingSoilData ? "Loading..." : "Get Soil Data"}
+                    </Button>
+                  )}
                 </CardTitle>
                 {soilHealthData && (
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-sm text-muted-foreground animate-in slide-in-from-top-2 duration-500">
                     <p>✅ Soil Health Card: {soilHealthData.cardNumber}</p>
                     <p>📍 Location: {soilHealthData.location}</p>
                     <p>📅 Last Updated: {soilHealthData.lastUpdated.toLocaleDateString()}</p>
@@ -437,124 +439,178 @@ const Recommendation = () => {
                 )}
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="pH"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-card-foreground">Soil pH *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.1"
-                            min="3"
-                            max="14"
-                            placeholder="6.5"
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            disabled={isLoading}
-                          />
-                        </FormControl>
-                        <FormDescription>Range: 3.0 - 14.0</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                {!soilHealthData ? (
+                  <div className="text-center py-12">
+                    <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-card-foreground mb-2">
+                      Get Your Soil Health Data
+                    </h3>
+                    <p className="text-muted-foreground mb-6">
+                      Enter your farm's geolocation to automatically fetch soil analysis data from your Soil Health Card
+                    </p>
+                    <Button 
+                      type="button" 
+                      onClick={fetchSoilData}
+                      disabled={isLoadingSoilData || isLoading}
+                      className="bg-earth hover:bg-earth/90 text-white"
+                    >
+                      {isLoadingSoilData ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Fetching Location...
+                        </>
+                      ) : (
+                        <>
+                          <MapPin className="h-4 w-4 mr-2" />
+                          Get Soil Data from Location
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="animate-in slide-in-from-bottom-4 duration-700 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="pH"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-card-foreground">Soil pH *</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                min="3"
+                                max="14"
+                                placeholder="6.5"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                className="bg-background"
+                                readOnly
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Range: 3.0 - 14.0
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                  <FormField
-                    control={form.control}
-                    name="nitrogen"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-card-foreground">Nitrogen (ppm) *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="1000"
-                            placeholder="150"
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            disabled={isLoading}
-                          />
-                        </FormControl>
-                        <FormDescription>Available nitrogen content</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      <FormField
+                        control={form.control}
+                        name="nitrogen"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-card-foreground">Nitrogen (ppm) *</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="1000"
+                                placeholder="150"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                className="bg-background"
+                                readOnly
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Available nitrogen content
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                  <FormField
-                    control={form.control}
-                    name="phosphorus"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-card-foreground">Phosphorus (ppm) *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="200"
-                            placeholder="25"
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            disabled={isLoading}
-                          />
-                        </FormControl>
-                        <FormDescription>Available phosphorus content</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      <FormField
+                        control={form.control}
+                        name="phosphorus"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-card-foreground">Phosphorus (ppm) *</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="200"
+                                placeholder="25"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                className="bg-background"
+                                readOnly
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Available phosphorus content
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                  <FormField
-                    control={form.control}
-                    name="potassium"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-card-foreground">Potassium (ppm) *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="500"
-                            placeholder="120"
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            disabled={isLoading}
-                          />
-                        </FormControl>
-                        <FormDescription>Available potassium content</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      <FormField
+                        control={form.control}
+                        name="potassium"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-card-foreground">Potassium (ppm) *</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="500"
+                                placeholder="120"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                className="bg-background"
+                                readOnly
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Available potassium content
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                  <FormField
-                    control={form.control}
-                    name="organicCarbon"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-card-foreground">Organic Carbon (%) *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="10"
-                            placeholder="1.2"
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            disabled={isLoading}
-                          />
-                        </FormControl>
-                        <FormDescription>Organic matter content</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                      <FormField
+                        control={form.control}
+                        name="organicCarbon"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-card-foreground">Organic Carbon (%) *</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="10"
+                                placeholder="1.2"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                className="bg-background"
+                                readOnly
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Organic matter content
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        <span>Data automatically populated from Soil Health Card for your location</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
