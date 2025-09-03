@@ -62,10 +62,46 @@ const Recommendation = () => {
     try {
       toast({
         title: "Fetching soil data...",
-        description: "Getting soil health card data for your location",
+        description: "Getting location and soil health card data",
       });
 
-      const coordinates = await getUserLocation();
+      let coordinates: { lat: number; lon: number };
+      
+      try {
+        coordinates = await getUserLocation();
+      } catch (locationError) {
+        console.error('Geolocation error:', locationError);
+        
+        // Check if it's a permission error
+        if (locationError instanceof GeolocationPositionError) {
+          if (locationError.code === GeolocationPositionError.PERMISSION_DENIED) {
+            toast({
+              title: "Location Permission Required",
+              description: "Please allow location access to fetch soil data from your area",
+              variant: "destructive",
+            });
+          } else if (locationError.code === GeolocationPositionError.POSITION_UNAVAILABLE) {
+            toast({
+              title: "Location Unavailable",
+              description: "Unable to determine your location. Using default coordinates.",
+            });
+          } else {
+            toast({
+              title: "Location Timeout",
+              description: "Location request timed out. Using default coordinates.",
+            });
+          }
+        }
+        
+        // Use default coordinates for demonstration (New Delhi area)
+        coordinates = { lat: 28.6139, lon: 77.2090 };
+        
+        toast({
+          title: "Using default location",
+          description: "Fetching soil data for New Delhi region as fallback",
+        });
+      }
+
       const soilData = await getSoilHealthData(coordinates);
       setSoilHealthData(soilData);
       
@@ -84,8 +120,8 @@ const Recommendation = () => {
     } catch (error) {
       console.error('Error fetching soil data:', error);
       toast({
-        title: "Soil data unavailable",
-        description: "Please enter soil values manually or try again",
+        title: "Soil data service error",
+        description: "Unable to connect to soil health database. Please try again later.",
         variant: "destructive",
       });
     } finally {
