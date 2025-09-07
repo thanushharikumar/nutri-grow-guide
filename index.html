@@ -1,24 +1,448 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sustainable Fertilizer Usage Optimizer</title>
-    <meta name="description" content="AI-powered fertilizer optimization platform for sustainable agriculture. Get personalized recommendations based on soil analysis, crop health, and weather data." />
-    <meta name="author" content="Lovable" />
+    <meta name="description" content="AI-powered fertilizer recommendations for sustainable agriculture. Optimize crop yield with precise soil analysis and weather data.">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navigation">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <div class="nav-logo">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-14 9V3z"/>
+                    </svg>
+                </div>
+                <div class="nav-text">
+                    <h1 class="nav-title">Sustainable Fertilizer</h1>
+                    <p class="nav-subtitle">Usage Optimizer</p>
+                </div>
+            </div>
+            <div class="nav-links">
+                <a href="#" class="nav-link active" data-page="home">
+                    <svg class="nav-link-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/>
+                    </svg>
+                    <span>Home</span>
+                </a>
+                <a href="#" class="nav-link" data-page="recommendation">
+                    <svg class="nav-link-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <span>Get Recommendation</span>
+                </a>
+                <a href="#" class="nav-link" data-page="about">
+                    <svg class="nav-link-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>About</span>
+                </a>
+            </div>
+            <select class="nav-mobile" onchange="navigateToPage(this.value)">
+                <option value="home">Home</option>
+                <option value="recommendation">Get Recommendation</option>
+                <option value="about">About</option>
+            </select>
+        </div>
+    </nav>
 
-    <meta property="og:title" content="Sustainable Fertilizer Usage Optimizer" />
-    <meta property="og:description" content="AI-powered fertilizer optimization platform for sustainable agriculture. Get personalized recommendations based on soil analysis, crop health, and weather data." />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <!-- Main Content -->
+    <main id="main-content">
+        <!-- Home Page -->
+        <div id="home-page" class="page active">
+            <!-- Hero Section -->
+            <section class="hero-section">
+                <div class="hero-background"></div>
+                <div class="hero-overlay"></div>
+                <div class="hero-content">
+                    <h1 class="hero-title">
+                        Sustainable Fertilizer
+                        <span class="hero-highlight">Usage Optimizer</span>
+                    </h1>
+                    <p class="hero-description">
+                        Harness the power of AI, weather data, and soil science to optimize your fertilizer usage,
+                        increase yields, and promote sustainable agriculture.
+                    </p>
+                    <div class="hero-buttons">
+                        <button class="btn btn-primary" onclick="navigateToPage('recommendation')">
+                            Get Smart Recommendations
+                            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                            </svg>
+                        </button>
+                        <button class="btn btn-outline" onclick="navigateToPage('about')">
+                            Learn More
+                        </button>
+                    </div>
+                </div>
+            </section>
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@lovable_dev" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-  </head>
+            <!-- Features Section -->
+            <section class="features-section">
+                <div class="container">
+                    <div class="section-header">
+                        <h2 class="section-title">Advanced Agricultural Intelligence</h2>
+                        <p class="section-description">
+                            Our comprehensive platform combines cutting-edge technology with agricultural expertise
+                            to deliver precise, sustainable fertilizer recommendations.
+                        </p>
+                    </div>
+                    
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-14 9V3z"/>
+                                </svg>
+                            </div>
+                            <h3 class="feature-title">Smart Soil Analysis</h3>
+                            <p class="feature-description">Advanced soil testing and nutrient analysis for optimal fertilizer recommendations.</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon earth">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                                </svg>
+                            </div>
+                            <h3 class="feature-title">Crop Image Analysis</h3>
+                            <p class="feature-description">AI-powered crop health assessment using computer vision to detect nutrient deficiencies.</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon glow">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <h3 class="feature-title">Weather Integration</h3>
+                            <p class="feature-description">Real-time weather data integration for precise fertilizer timing recommendations.</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon earth">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                </svg>
+                            </div>
+                            <h3 class="feature-title">Sustainable Practices</h3>
+                            <p class="feature-description">Promoting environmentally friendly farming with optimized fertilizer usage.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+            <!-- Benefits Section -->
+            <section class="benefits-section">
+                <div class="container">
+                    <div class="benefits-grid">
+                        <div class="benefits-content">
+                            <h2 class="benefits-title">Maximize Your Farm's Potential</h2>
+                            <p class="benefits-description">
+                                Our intelligent system analyzes multiple factors including soil composition, 
+                                crop health, weather conditions, and historical data to provide you with 
+                                the most accurate fertilizer recommendations.
+                            </p>
+                            <div class="benefits-list">
+                                <div class="benefit-item">
+                                    <svg class="benefit-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    <span>Increase crop yield by up to 25%</span>
+                                </div>
+                                <div class="benefit-item">
+                                    <svg class="benefit-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    <span>Reduce fertilizer costs by 15-30%</span>
+                                </div>
+                                <div class="benefit-item">
+                                    <svg class="benefit-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    <span>Minimize environmental impact</span>
+                                </div>
+                                <div class="benefit-item">
+                                    <svg class="benefit-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    <span>Optimize application timing</span>
+                                </div>
+                                <div class="benefit-item">
+                                    <svg class="benefit-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    <span>Improve soil health over time</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="stats-card">
+                            <div class="stats-main">
+                                <div class="stat-number">85%</div>
+                                <div class="stat-label">Average Sustainability Score</div>
+                                <div class="stat-description">Achieved by farmers using our recommendations</div>
+                            </div>
+                            
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <div class="stat-value">25%</div>
+                                    <div class="stat-name">Yield Increase</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-value">30%</div>
+                                    <div class="stat-name">Cost Reduction</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CTA Section -->
+            <section class="cta-section">
+                <div class="container">
+                    <h2 class="cta-title">Ready to Transform Your Farming?</h2>
+                    <p class="cta-description">
+                        Join thousands of farmers who are already using our platform to optimize their 
+                        fertilizer usage and increase their sustainability scores.
+                    </p>
+                    <button class="btn btn-primary" onclick="navigateToPage('recommendation')">
+                        Start Your Analysis
+                        <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                        </svg>
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <!-- Recommendation Page -->
+        <div id="recommendation-page" class="page">
+            <div class="container form-container">
+                <div class="page-header">
+                    <h1 class="page-title">Get Your Fertilizer Recommendation</h1>
+                    <p class="page-description">
+                        Provide your soil analysis data and crop information to receive personalized, 
+                        sustainable fertilizer recommendations powered by AI and real-time weather data.
+                    </p>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loading-card" class="card loading-card hidden">
+                    <div class="card-content">
+                        <div class="loading-content">
+                            <div class="spinner"></div>
+                            <div class="loading-text">
+                                <div class="loading-title">Analyzing your data...</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progress-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recommendation Form -->
+                <form id="recommendation-form" class="recommendation-form">
+                    <!-- Crop Information Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <svg class="card-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-14 9V3z"/>
+                                </svg>
+                                <span>Crop Information</span>
+                            </h3>
+                        </div>
+                        <div class="card-content">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="cropType" class="form-label">Crop Type *</label>
+                                    <select id="cropType" name="cropType" class="form-select" required>
+                                        <option value="">Select crop type</option>
+                                        <option value="rice">Rice</option>
+                                        <option value="wheat">Wheat</option>
+                                        <option value="maize">Maize</option>
+                                        <option value="millets">Millets</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="soilType" class="form-label">Soil Type *</label>
+                                    <select id="soilType" name="soilType" class="form-select" required>
+                                        <option value="">Select soil type</option>
+                                        <option value="sandy">Sandy</option>
+                                        <option value="loamy">Loamy</option>
+                                        <option value="clayey">Clayey</option>
+                                        <option value="silty">Silty</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Crop Image Upload -->
+                            <div class="image-upload-section">
+                                <label class="form-label">Crop Image Analysis (Optional)</label>
+                                <div class="image-upload-grid">
+                                    <div class="upload-area" onclick="document.getElementById('cropImage').click()">
+                                        <input type="file" id="cropImage" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                                        <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                        </svg>
+                                        <div class="upload-text">Upload crop image for AI analysis</div>
+                                        <button type="button" class="btn btn-small">
+                                            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                            </svg>
+                                            Choose Image
+                                        </button>
+                                    </div>
+                                    
+                                    <div id="image-preview" class="image-preview hidden">
+                                        <div class="preview-label">Preview:</div>
+                                        <img id="preview-img" class="preview-image" alt="Crop preview">
+                                        <div class="preview-status">
+                                            <svg class="status-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                            </svg>
+                                            Ready for AI analysis
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="upload-info">Max 5MB • JPEG, PNG supported</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Soil Analysis Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title-row">
+                                <h3 class="card-title">
+                                    <svg class="card-icon earth" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    </svg>
+                                    <span>Soil Analysis Data</span>
+                                </h3>
+                                <button type="button" class="btn btn-outline btn-small" id="fetch-soil-btn" onclick="fetchSoilData()">
+                                    <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    </svg>
+                                    Fetch from SHC
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="form-grid three-col">
+                                <div class="form-group">
+                                    <label for="pH" class="form-label">Soil pH *</label>
+                                    <input type="number" id="pH" name="pH" class="form-input" value="6.5" min="3" max="14" step="0.1" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="nitrogen" class="form-label">Nitrogen (ppm) *</label>
+                                    <input type="number" id="nitrogen" name="nitrogen" class="form-input" value="150" min="0" max="1000" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="phosphorus" class="form-label">Phosphorus (ppm) *</label>
+                                    <input type="number" id="phosphorus" name="phosphorus" class="form-input" value="25" min="0" max="200" required>
+                                </div>
+                            </div>
+                            
+                            <div class="form-grid two-col">
+                                <div class="form-group">
+                                    <label for="potassium" class="form-label">Potassium (ppm) *</label>
+                                    <input type="number" id="potassium" name="potassium" class="form-input" value="120" min="0" max="500" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="organicCarbon" class="form-label">Organic Carbon (%) *</label>
+                                    <input type="number" id="organicCarbon" name="organicCarbon" class="form-input" value="1.2" min="0" max="10" step="0.1" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn btn-primary btn-large">
+                        Generate Recommendations
+                        <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </button>
+                </form>
+
+                <!-- Results Section -->
+                <div id="results-section" class="results-section hidden">
+                    <div class="results-header">
+                        <button class="btn btn-outline" onclick="resetForm()">← New Analysis</button>
+                        <h1 class="results-title">Your Personalized Recommendations</h1>
+                        <p class="results-description">Based on your soil analysis, weather conditions, and crop requirements</p>
+                    </div>
+                    
+                    <div id="results-content"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- About Page -->
+        <div id="about-page" class="page">
+            <div class="container">
+                <div class="about-content">
+                    <h1 class="about-title">About Sustainable Fertilizer Usage Optimizer</h1>
+                    <p class="about-description">
+                        Our platform leverages artificial intelligence, soil science, and real-time weather data 
+                        to provide farmers with precise, sustainable fertilizer recommendations.
+                    </p>
+                    
+                    <div class="about-sections">
+                        <div class="about-section">
+                            <h2>Our Mission</h2>
+                            <p>To promote sustainable agriculture through intelligent fertilizer optimization, helping farmers increase yields while minimizing environmental impact.</p>
+                        </div>
+                        
+                        <div class="about-section">
+                            <h2>How It Works</h2>
+                            <ul>
+                                <li>Advanced soil analysis and nutrient testing</li>
+                                <li>AI-powered crop health assessment</li>
+                                <li>Real-time weather data integration</li>
+                                <li>Personalized fertilizer recommendations</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="about-section">
+                            <h2>Benefits</h2>
+                            <ul>
+                                <li>Increase crop yield by up to 25%</li>
+                                <li>Reduce fertilizer costs by 15-30%</li>
+                                <li>Minimize environmental impact</li>
+                                <li>Improve soil health over time</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <p class="footer-title">Sustainable Fertilizer Usage Optimizer</p>
+                <p class="footer-subtitle">Optimizing agriculture for a sustainable future</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="services.js"></script>
+    <script src="app.js"></script>
+</body>
 </html>
