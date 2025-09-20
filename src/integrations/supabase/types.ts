@@ -14,7 +14,254 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      crop_analysis: {
+        Row: {
+          analysis_date: string
+          confidence: number
+          created_at: string
+          crop_health: string
+          deficiencies: Json
+          id: string
+          image_url: string | null
+          recommendations: string[]
+        }
+        Insert: {
+          analysis_date?: string
+          confidence: number
+          created_at?: string
+          crop_health: string
+          deficiencies?: Json
+          id?: string
+          image_url?: string | null
+          recommendations?: string[]
+        }
+        Update: {
+          analysis_date?: string
+          confidence?: number
+          created_at?: string
+          crop_health?: string
+          deficiencies?: Json
+          id?: string
+          image_url?: string | null
+          recommendations?: string[]
+        }
+        Relationships: []
+      }
+      fertilizer_recommendations: {
+        Row: {
+          application_schedule: Json
+          cost_estimate: number
+          created_at: string
+          crop_analysis_id: string | null
+          crop_type: string
+          expected_yield_increase: number
+          id: string
+          nitrogen_recommendation: number
+          phosphorus_recommendation: number
+          potassium_recommendation: number
+          products: Json
+          soil_data: Json
+          sustainability_score: number
+          weather_considerations: string[]
+          weather_data: Json
+        }
+        Insert: {
+          application_schedule?: Json
+          cost_estimate: number
+          created_at?: string
+          crop_analysis_id?: string | null
+          crop_type: string
+          expected_yield_increase: number
+          id?: string
+          nitrogen_recommendation: number
+          phosphorus_recommendation: number
+          potassium_recommendation: number
+          products?: Json
+          soil_data: Json
+          sustainability_score: number
+          weather_considerations?: string[]
+          weather_data: Json
+        }
+        Update: {
+          application_schedule?: Json
+          cost_estimate?: number
+          created_at?: string
+          crop_analysis_id?: string | null
+          crop_type?: string
+          expected_yield_increase?: number
+          id?: string
+          nitrogen_recommendation?: number
+          phosphorus_recommendation?: number
+          potassium_recommendation?: number
+          products?: Json
+          soil_data?: Json
+          sustainability_score?: number
+          weather_considerations?: string[]
+          weather_data?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fertilizer_recommendations_crop_analysis_id_fkey"
+            columns: ["crop_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "crop_analysis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fertilizer_rules: {
+        Row: {
+          crop: string
+          id: number
+          k_min: number | null
+          n_min: number | null
+          p_min: number | null
+          recommendation: string | null
+        }
+        Insert: {
+          crop: string
+          id?: never
+          k_min?: number | null
+          n_min?: number | null
+          p_min?: number | null
+          recommendation?: string | null
+        }
+        Update: {
+          crop?: string
+          id?: never
+          k_min?: number | null
+          n_min?: number | null
+          p_min?: number | null
+          recommendation?: string | null
+        }
+        Relationships: []
+      }
+      recommendation_logs: {
+        Row: {
+          crop: string | null
+          id: number
+          k: number | null
+          n: number | null
+          oc: number | null
+          output: Json | null
+          p: number | null
+          ph: number | null
+          ts: string | null
+        }
+        Insert: {
+          crop?: string | null
+          id?: never
+          k?: number | null
+          n?: number | null
+          oc?: number | null
+          output?: Json | null
+          p?: number | null
+          ph?: number | null
+          ts?: string | null
+        }
+        Update: {
+          crop?: string | null
+          id?: never
+          k?: number | null
+          n?: number | null
+          oc?: number | null
+          output?: Json | null
+          p?: number | null
+          ph?: number | null
+          ts?: string | null
+        }
+        Relationships: []
+      }
+      soil_health: {
+        Row: {
+          created_at: string
+          electrical_conductivity: number | null
+          id: string
+          last_updated: string
+          latitude: number
+          longitude: number
+          nitrogen: number
+          organic_carbon: number
+          ph: number
+          phosphorus: number
+          potassium: number
+          region: string
+          soil_type: string
+        }
+        Insert: {
+          created_at?: string
+          electrical_conductivity?: number | null
+          id?: string
+          last_updated?: string
+          latitude: number
+          longitude: number
+          nitrogen?: number
+          organic_carbon?: number
+          ph: number
+          phosphorus?: number
+          potassium?: number
+          region: string
+          soil_type: string
+        }
+        Update: {
+          created_at?: string
+          electrical_conductivity?: number | null
+          id?: string
+          last_updated?: string
+          latitude?: number
+          longitude?: number
+          nitrogen?: number
+          organic_carbon?: number
+          ph?: number
+          phosphorus?: number
+          potassium?: number
+          region?: string
+          soil_type?: string
+        }
+        Relationships: []
+      }
+      weather_data: {
+        Row: {
+          created_at: string
+          description: string
+          humidity: number
+          id: string
+          latitude: number
+          location: string
+          longitude: number
+          rainfall: number
+          recorded_at: string
+          temperature: number
+          wind_speed: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          humidity: number
+          id?: string
+          latitude: number
+          location: string
+          longitude: number
+          rainfall?: number
+          recorded_at?: string
+          temperature: number
+          wind_speed?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          humidity?: number
+          id?: string
+          latitude?: number
+          location?: string
+          longitude?: number
+          rainfall?: number
+          recorded_at?: string
+          temperature?: number
+          wind_speed?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
