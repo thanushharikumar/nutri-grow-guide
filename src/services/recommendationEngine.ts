@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { WeatherData } from './weatherService';
 import { CropAnalysisResult } from './cropAnalysisService';
 
@@ -42,7 +43,42 @@ export interface RecommendationResult {
   costEstimate: number; // USD per hectare
 }
 
-export const generateRecommendation = (
+export const generateRecommendation = async (
+  cropType: string,
+  soilData: SoilData,
+  weatherData: WeatherData,
+  cropAnalysis?: CropAnalysisResult
+): Promise<RecommendationResult> => {
+  try {
+    // Call Supabase edge function for recommendation generation
+    const { data, error } = await supabase.functions.invoke('generate-recommendation', {
+      body: { 
+        cropType,
+        soilData,
+        weatherData,
+        cropAnalysis
+      }
+    });
+
+    if (error) {
+      console.error('Error calling recommendation function:', error);
+      throw new Error(error.message || 'Unable to generate recommendation');
+    }
+
+    if (!data) {
+      throw new Error('No recommendation data received');
+    }
+
+    return data as RecommendationResult;
+  } catch (error) {
+    console.error('Error generating recommendation:', error);
+    // Fallback to local generation if edge function fails
+    return generateLocalRecommendation(cropType, soilData, weatherData, cropAnalysis);
+  }
+};
+
+// Fallback local recommendation generation
+const generateLocalRecommendation = (
   cropType: string,
   soilData: SoilData,
   weatherData: WeatherData,

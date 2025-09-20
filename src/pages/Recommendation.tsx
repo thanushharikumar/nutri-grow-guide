@@ -115,7 +115,7 @@ const Recommendation = () => {
 
       toast({
         title: "Soil data loaded!",
-        description: `Found soil health card: ${soilData.cardNumber}`,
+        description: `Found soil health data for your location`,
       });
     } catch (error) {
       console.error('Error fetching soil data:', error);
@@ -235,7 +235,7 @@ const Recommendation = () => {
         organicCarbon: data.organicCarbon,
       };
 
-      const recommendation = generateRecommendation(
+      const recommendation = await generateRecommendation(
         data.cropType,
         soilData,
         weather,
@@ -468,8 +468,7 @@ const Recommendation = () => {
                 </CardTitle>
                 {soilHealthData && (
                   <div className="text-sm text-muted-foreground animate-in slide-in-from-top-2 duration-500">
-                    <p>✅ Soil Health Card: {soilHealthData.cardNumber}</p>
-                    <p>📍 Location: {soilHealthData.location}</p>
+                    <p>📍 Location: {soilHealthData.location.latitude.toFixed(2)}°N, {soilHealthData.location.longitude.toFixed(2)}°E</p>
                     <p>📅 Last Updated: {soilHealthData.lastUpdated.toLocaleDateString()}</p>
                   </div>
                 )}

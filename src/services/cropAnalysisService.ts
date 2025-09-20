@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 // Mock CNN analysis service for crop nutrient deficiency detection
 export interface NutrientDeficiency {
   nutrient: 'nitrogen' | 'phosphorus' | 'potassium' | 'iron' | 'magnesium';
@@ -66,11 +68,35 @@ export const analyzeCropImage = async (imageFile: File): Promise<CropAnalysisRes
         'Consider soil pH testing',
         'Implement precision agriculture techniques'
       ];
-  
-  return {
+
+  const result: CropAnalysisResult = {
     cropHealth: healthScore,
     deficiencies: mockDeficiencies,
     recommendations,
     confidence: 0.85 + Math.random() * 0.15
   };
+
+    // Store analysis result in database
+    try {
+      const { data, error } = await supabase
+        .from('crop_analysis')
+        .insert({
+          crop_health: result.cropHealth,
+          deficiencies: JSON.parse(JSON.stringify(result.deficiencies)),
+          recommendations: result.recommendations,
+          confidence: result.confidence
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error storing crop analysis:', error);
+      } else {
+        console.log('Stored crop analysis with ID:', data.id);
+      }
+    } catch (error) {
+      console.error('Error storing crop analysis:', error);
+    }
+  
+  return result;
 };

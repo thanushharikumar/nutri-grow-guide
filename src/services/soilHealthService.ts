@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { Coordinates } from './weatherService';
 
 export interface SoilHealthData {
@@ -7,133 +8,61 @@ export interface SoilHealthData {
   phosphorus: number; // ppm
   potassium: number; // ppm
   organicCarbon: number; // %
-  electricalConductivity: number; // dS/m
-  sulfur: number; // ppm
-  zinc: number; // ppm
-  boron: number; // ppm
-  iron: number; // ppm
-  manganese: number; // ppm
-  copper: number; // ppm
-  location: string;
-  cardNumber?: string;
+  electricalConductivity?: number; // dS/m
+  micronutrients?: {
+    iron: number; // ppm
+    manganese: number; // ppm
+    zinc: number; // ppm
+    copper: number; // ppm
+  };
+  location: {
+    latitude: number;
+    longitude: number;
+  };
   lastUpdated: Date;
 }
 
-// Mock soil health card database - In production, this would be an API call
-const mockSoilHealthDatabase: Record<string, SoilHealthData> = {
-  // North India - Punjab/Haryana region
-  'north_plains': {
+// Mock soil health database for different regions
+const mockSoilHealthDatabase: Record<string, Omit<SoilHealthData, 'location' | 'lastUpdated'>> = {
+  'North India': {
     soilType: 'loamy',
     pH: 7.2,
-    nitrogen: 165,
-    phosphorus: 28,
-    potassium: 135,
-    organicCarbon: 0.8,
+    nitrogen: 280,
+    phosphorus: 45,
+    potassium: 180,
+    organicCarbon: 1.8,
     electricalConductivity: 0.3,
-    sulfur: 12,
-    zinc: 0.8,
-    boron: 0.5,
-    iron: 8.5,
-    manganese: 3.2,
-    copper: 1.1,
-    location: 'North Plains',
-    cardNumber: 'SHC-NP-2024-001',
-    lastUpdated: new Date('2024-01-15')
+    micronutrients: { iron: 15, manganese: 8, zinc: 1.5, copper: 0.8 }
   },
-  // South India - Tamil Nadu/Karnataka
-  'south_plains': {
+  'West India': {
     soilType: 'clayey',
     pH: 6.8,
-    nitrogen: 145,
-    phosphorus: 22,
-    potassium: 115,
+    nitrogen: 320,
+    phosphorus: 38,
+    potassium: 160,
     organicCarbon: 1.2,
     electricalConductivity: 0.4,
-    sulfur: 15,
-    zinc: 0.6,
-    boron: 0.4,
-    iron: 12.3,
-    manganese: 4.5,
-    copper: 0.9,
-    location: 'South Plains',
-    cardNumber: 'SHC-SP-2024-002',
-    lastUpdated: new Date('2024-02-10')
+    micronutrients: { iron: 12, manganese: 6, zinc: 1.2, copper: 0.6 }
   },
-  // Western India - Maharashtra/Gujarat
-  'west_plains': {
-    soilType: 'silty',
-    pH: 7.8,
-    nitrogen: 125,
-    phosphorus: 18,
-    potassium: 98,
-    organicCarbon: 0.9,
-    electricalConductivity: 0.5,
-    sulfur: 10,
-    zinc: 0.4,
-    boron: 0.3,
-    iron: 6.8,
-    manganese: 2.8,
-    copper: 0.7,
-    location: 'West Plains',
-    cardNumber: 'SHC-WP-2024-003',
-    lastUpdated: new Date('2024-01-28')
-  },
-  // Eastern India - West Bengal/Bihar
-  'east_plains': {
-    soilType: 'clayey',
-    pH: 6.2,
-    nitrogen: 180,
-    phosphorus: 35,
-    potassium: 158,
-    organicCarbon: 1.8,
-    electricalConductivity: 0.2,
-    sulfur: 18,
-    zinc: 1.2,
-    boron: 0.6,
-    iron: 15.2,
-    manganese: 6.1,
-    copper: 1.4,
-    location: 'East Plains',
-    cardNumber: 'SHC-EP-2024-004',
-    lastUpdated: new Date('2024-02-05')
-  },
-  // Coastal regions
-  'coastal': {
+  'South India': {
     soilType: 'sandy',
-    pH: 8.1,
-    nitrogen: 95,
-    phosphorus: 15,
-    potassium: 78,
-    organicCarbon: 0.6,
-    electricalConductivity: 0.8,
-    sulfur: 8,
-    zinc: 0.3,
-    boron: 0.2,
-    iron: 4.5,
-    manganese: 1.8,
-    copper: 0.5,
-    location: 'Coastal Region',
-    cardNumber: 'SHC-CR-2024-005',
-    lastUpdated: new Date('2024-01-20')
+    pH: 6.5,
+    nitrogen: 180,
+    phosphorus: 28,
+    potassium: 120,
+    organicCarbon: 0.8,
+    electricalConductivity: 0.2,
+    micronutrients: { iron: 18, manganese: 10, zinc: 1.8, copper: 1.0 }
   },
-  // Hill regions
-  'hills': {
-    soilType: 'loamy',
-    pH: 5.8,
-    nitrogen: 210,
+  'East India': {
+    soilType: 'silty',
+    pH: 7.0,
+    nitrogen: 250,
     phosphorus: 42,
-    potassium: 185,
-    organicCarbon: 2.5,
-    electricalConductivity: 0.1,
-    sulfur: 22,
-    zinc: 1.8,
-    boron: 0.8,
-    iron: 18.5,
-    manganese: 8.2,
-    copper: 1.9,
-    location: 'Hill Region',
-    cardNumber: 'SHC-HR-2024-006',
-    lastUpdated: new Date('2024-02-12')
+    potassium: 200,
+    organicCarbon: 1.5,
+    electricalConductivity: 0.2,
+    micronutrients: { iron: 20, manganese: 12, zinc: 2.0, copper: 1.2 }
   }
 };
 
@@ -141,100 +70,121 @@ const mockSoilHealthDatabase: Record<string, SoilHealthData> = {
 const getRegionFromCoordinates = (coordinates: Coordinates): string => {
   const { lat, lon } = coordinates;
   
-  // Indian subcontinent coordinate ranges
-  if (lat >= 28 && lat <= 32 && lon >= 74 && lon <= 78) {
-    return 'north_plains'; // Punjab, Haryana, North Rajasthan
-  } else if (lat >= 8 && lat <= 15 && lon >= 76 && lon <= 80) {
-    return 'south_plains'; // Tamil Nadu, Karnataka, Andhra Pradesh
-  } else if (lat >= 15 && lat <= 25 && lon >= 72 && lon <= 78) {
-    return 'west_plains'; // Maharashtra, Gujarat, Madhya Pradesh
-  } else if (lat >= 22 && lat <= 28 && lon >= 84 && lon <= 90) {
-    return 'east_plains'; // West Bengal, Bihar, Jharkhand
-  } else if ((lat >= 8 && lat <= 20 && lon >= 68 && lon <= 76) || 
-             (lat >= 8 && lat <= 20 && lon >= 80 && lon <= 88)) {
-    return 'coastal'; // Coastal regions
-  } else if (lat >= 25 && lat <= 35 && lon >= 75 && lon <= 85) {
-    return 'hills'; // Himalayan foothills, hill stations
-  }
+  if (lat >= 25 && lat <= 35) return 'North India';
+  if (lat >= 15 && lat <= 25 && lon >= 68 && lon <= 77) return 'West India';
+  if (lat >= 8 && lat <= 20) return 'South India';
+  if (lat >= 20 && lat <= 28 && lon >= 84 && lon <= 92) return 'East India';
   
-  // Default to most common soil type for India
-  return 'north_plains';
+  return 'North India'; // Default
 };
 
 export const getSoilHealthData = async (coordinates: Coordinates): Promise<SoilHealthData> => {
   try {
-    // In production, this would make an API call to:
-    // - Government soil health card database
-    // - Agricultural department APIs
-    // - Remote sensing soil data services
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
+    // First try to get soil health data from database
+    const { data: soilData, error } = await supabase
+      .from('soil_health')
+      .select('*')
+      .gte('latitude', coordinates.lat - 0.1)
+      .lte('latitude', coordinates.lat + 0.1)
+      .gte('longitude', coordinates.lon - 0.1)
+      .lte('longitude', coordinates.lon + 0.1)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (soilData && !error) {
+      return {
+        soilType: soilData.soil_type as 'sandy' | 'loamy' | 'clayey' | 'silty',
+        nitrogen: Number(soilData.nitrogen),
+        phosphorus: Number(soilData.phosphorus),
+        potassium: Number(soilData.potassium),
+        pH: Number(soilData.ph),
+        organicCarbon: Number(soilData.organic_carbon),
+        electricalConductivity: soilData.electrical_conductivity ? Number(soilData.electrical_conductivity) : undefined,
+        micronutrients: {
+          iron: 15 + Math.random() * 10,
+          manganese: 8 + Math.random() * 5,
+          zinc: 1.5 + Math.random() * 1,
+          copper: 0.8 + Math.random() * 0.4
+        },
+        location: {
+          latitude: coordinates.lat,
+          longitude: coordinates.lon
+        },
+        lastUpdated: new Date(soilData.last_updated)
+      };
+    }
+
+    // If no data found, generate mock data based on region and store it
     const region = getRegionFromCoordinates(coordinates);
-    const baseData = mockSoilHealthDatabase[region];
+    const baseData = mockSoilHealthDatabase[region] || mockSoilHealthDatabase['North India'];
     
-    // Add some realistic variation to the data
-    const variation = {
-      pH: (Math.random() - 0.5) * 0.4, // ±0.2 pH units
-      nitrogen: (Math.random() - 0.5) * 30, // ±15 ppm
-      phosphorus: (Math.random() - 0.5) * 10, // ±5 ppm
-      potassium: (Math.random() - 0.5) * 40, // ±20 ppm
-      organicCarbon: (Math.random() - 0.5) * 0.4, // ±0.2%
-    };
-    
-    const soilData: SoilHealthData = {
+    // Add some realistic variations
+    const variationFactor = 0.1;
+    const mockData: SoilHealthData = {
       ...baseData,
-      pH: Math.round((baseData.pH + variation.pH) * 10) / 10,
-      nitrogen: Math.max(0, Math.round(baseData.nitrogen + variation.nitrogen)),
-      phosphorus: Math.max(0, Math.round(baseData.phosphorus + variation.phosphorus)),
-      potassium: Math.max(0, Math.round(baseData.potassium + variation.potassium)),
-      organicCarbon: Math.max(0.1, Math.round((baseData.organicCarbon + variation.organicCarbon) * 10) / 10),
-      location: `${baseData.location} (${coordinates.lat.toFixed(2)}°N, ${coordinates.lon.toFixed(2)}°E)`,
+      nitrogen: Math.round(baseData.nitrogen * (1 + (Math.random() - 0.5) * variationFactor)),
+      phosphorus: Math.round(baseData.phosphorus * (1 + (Math.random() - 0.5) * variationFactor)),
+      potassium: Math.round(baseData.potassium * (1 + (Math.random() - 0.5) * variationFactor)),
+      pH: Math.round((baseData.pH + (Math.random() - 0.5) * 0.4) * 10) / 10,
+      location: {
+        latitude: coordinates.lat,
+        longitude: coordinates.lon
+      },
+      lastUpdated: new Date()
     };
-    
-    return soilData;
+
+    // Store the generated data for future use
+    const { error: insertError } = await supabase
+      .from('soil_health')
+      .insert({
+        latitude: coordinates.lat,
+        longitude: coordinates.lon,
+        soil_type: mockData.soilType,
+        ph: mockData.pH,
+        nitrogen: mockData.nitrogen,
+        phosphorus: mockData.phosphorus,
+        potassium: mockData.potassium,
+        organic_carbon: mockData.organicCarbon,
+        electrical_conductivity: mockData.electricalConductivity,
+        region: region
+      });
+
+    if (insertError) {
+      console.error('Error storing soil health data:', insertError);
+    }
+
+    return mockData;
   } catch (error) {
     console.error('Error fetching soil health data:', error);
-    throw new Error('Unable to fetch soil health card data for your location');
+    throw new Error('Unable to fetch soil health information');
   }
 };
 
-export const validateSoilHealthCard = (cardNumber: string): Promise<boolean> => {
-  // Mock validation - in production, verify against government database
-  return Promise.resolve(cardNumber.startsWith('SHC-') && cardNumber.length >= 10);
+export const validateSoilHealthCard = async (cardNumber: string): Promise<boolean> => {
+  return cardNumber.startsWith('SHC-') && cardNumber.length >= 10;
 };
 
 export const searchNearbyFarms = async (coordinates: Coordinates, radius: number = 5): Promise<SoilHealthData[]> => {
-  // Mock function to find nearby farms with soil data
-  // In production, this would query a geospatial database
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
   const region = getRegionFromCoordinates(coordinates);
-  const baseData = mockSoilHealthDatabase[region];
+  const baseData = mockSoilHealthDatabase[region] || mockSoilHealthDatabase['North India'];
   
-  // Generate 3-5 nearby farm data points
   const nearbyFarms: SoilHealthData[] = [];
   const farmCount = 3 + Math.floor(Math.random() * 3);
   
   for (let i = 0; i < farmCount; i++) {
-    const variation = {
-      pH: (Math.random() - 0.5) * 1.0,
-      nitrogen: (Math.random() - 0.5) * 60,
-      phosphorus: (Math.random() - 0.5) * 20,
-      potassium: (Math.random() - 0.5) * 80,
-      organicCarbon: (Math.random() - 0.5) * 0.8,
-    };
-    
+    const variation = 0.15;
     nearbyFarms.push({
       ...baseData,
-      pH: Math.round((baseData.pH + variation.pH) * 10) / 10,
-      nitrogen: Math.max(0, Math.round(baseData.nitrogen + variation.nitrogen)),
-      phosphorus: Math.max(0, Math.round(baseData.phosphorus + variation.phosphorus)),
-      potassium: Math.max(0, Math.round(baseData.potassium + variation.potassium)),
-      organicCarbon: Math.max(0.1, Math.round((baseData.organicCarbon + variation.organicCarbon) * 10) / 10),
-      location: `Farm ${i + 1} - ${(Math.random() * radius).toFixed(1)}km away`,
-      cardNumber: `SHC-${region.toUpperCase()}-2024-${String(100 + i).padStart(3, '0')}`,
+      nitrogen: Math.round(baseData.nitrogen * (1 + (Math.random() - 0.5) * variation)),
+      phosphorus: Math.round(baseData.phosphorus * (1 + (Math.random() - 0.5) * variation)),
+      potassium: Math.round(baseData.potassium * (1 + (Math.random() - 0.5) * variation)),
+      pH: Math.round((baseData.pH + (Math.random() - 0.5) * 0.6) * 10) / 10,
+      location: {
+        latitude: coordinates.lat + (Math.random() - 0.5) * 0.1,
+        longitude: coordinates.lon + (Math.random() - 0.5) * 0.1
+      },
+      lastUpdated: new Date()
     });
   }
   
