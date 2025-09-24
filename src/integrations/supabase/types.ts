@@ -136,6 +136,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ml_predictions: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          id: string
+          input_data: Json
+          model_version: string
+          prediction_result: Json
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          input_data: Json
+          model_version?: string
+          prediction_result: Json
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          input_data?: Json
+          model_version?: string
+          prediction_result?: Json
+        }
+        Relationships: []
+      }
       recommendation_logs: {
         Row: {
           crop: string | null
