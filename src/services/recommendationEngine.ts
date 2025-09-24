@@ -50,23 +50,30 @@ export const generateRecommendation = async (
   cropAnalysis?: CropAnalysisResult
 ): Promise<RecommendationResult> => {
   try {
-    // Call Supabase edge function for recommendation generation
+    // First, get ML prediction
+    const mlPrediction = await getMLPrediction(cropType, soilData, weatherData, cropAnalysis);
+    
+    // Call Supabase edge function for recommendation generation with ML prediction
     const { data, error } = await supabase.functions.invoke('generate-recommendation', {
       body: { 
         cropType,
         soilData,
         weatherData,
-        cropAnalysis
+        cropAnalysis,
+        mlPrediction // Include ML prediction data
       }
     });
 
     if (error) {
       console.error('Error calling recommendation function:', error);
-      throw new Error(error.message || 'Unable to generate recommendation');
+      // Fallback to local generation with ML prediction data
+      return generateLocalRecommendation(cropType, soilData, weatherData, cropAnalysis, mlPrediction);
     }
 
     if (!data) {
-      throw new Error('No recommendation data received');
+      console.warn('No recommendation data received from edge function');
+      // Fallback to local generation with ML prediction data
+      return generateLocalRecommendation(cropType, soilData, weatherData, cropAnalysis, mlPrediction);
     }
 
     return data as RecommendationResult;
@@ -77,12 +84,55 @@ export const generateRecommendation = async (
   }
 };
 
+// New function to get ML predictions
+const getMLPrediction = async (
+  cropType: string,
+  soilData: SoilData,
+  weatherData: WeatherData,
+  cropAnalysis?: CropAnalysisResult
+) => {
+  try {
+    console.log('Calling ML prediction service with data:', {
+      cropType,
+      soilData,
+      weatherData
+    });
+
+    const { data, error } = await supabase.functions.invoke('ml-prediction', {
+      body: {
+        N: soilData.nitrogen,
+        P: soilData.phosphorus,
+        K: soilData.potassium,
+        pH: soilData.pH,
+        organicCarbon: soilData.organicCarbon,
+        cropType: cropType,
+        soilType: soilData.soilType,
+        temperature: weatherData.temperature,
+        rainfall: weatherData.rainfall,
+        humidity: weatherData.humidity
+      }
+    });
+
+    if (error) {
+      console.error('ML prediction error:', error);
+      return null;
+    }
+
+    console.log('ML Prediction successful:', data);
+    return data;
+  } catch (error) {
+    console.error('Error calling ML prediction service:', error);
+    return null;
+  }
+};
+
 // Fallback local recommendation generation
 const generateLocalRecommendation = (
   cropType: string,
   soilData: SoilData,
   weatherData: WeatherData,
-  cropAnalysis?: CropAnalysisResult
+  cropAnalysis?: CropAnalysisResult,
+  mlPrediction?: any // Add ML prediction parameter
 ): RecommendationResult => {
   
   // Base fertilizer requirements by crop type
@@ -94,6 +144,36 @@ const generateLocalRecommendation = (
   };
   
   let baseRecommendation = cropRequirements[cropType.toLowerCase()] || cropRequirements.rice;
+  
+  // Use ML prediction if available to enhance base recommendation
+  if (mlPrediction?.prediction) {
+    console.log('Using ML prediction to enhance recommendation:', mlPrediction.prediction);
+    
+    // Adjust base recommendation based on ML prediction
+    const mlFertilizerType = mlPrediction.prediction.type;
+    const mlAmount = mlPrediction.prediction.amount;
+    const mlConfidence = mlPrediction.prediction.confidence;
+    
+    // Apply ML adjustments based on fertilizer type and confidence
+    if (mlConfidence > 0.7) {
+      switch (mlFertilizerType) {
+        case 'Urea':
+          baseRecommendation.nitrogen = Math.round(baseRecommendation.nitrogen * 1.2);
+          break;
+        case 'DAP':
+          baseRecommendation.phosphorus = Math.round(baseRecommendation.phosphorus * 1.3);
+          break;
+        case 'MOP':
+          baseRecommendation.potassium = Math.round(baseRecommendation.potassium * 1.3);
+          break;
+        case 'NPK':
+          baseRecommendation.nitrogen = Math.round(baseRecommendation.nitrogen * 1.1);
+          baseRecommendation.phosphorus = Math.round(baseRecommendation.phosphorus * 1.1);
+          baseRecommendation.potassium = Math.round(baseRecommendation.potassium * 1.1);
+          break;
+      }
+    }
+  }
   
   // Adjust based on soil analysis
   const pHAdjustment = soilData.pH < 6.0 ? 1.1 : soilData.pH > 8.0 ? 0.9 : 1.0;
