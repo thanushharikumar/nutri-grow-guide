@@ -300,27 +300,35 @@ const generateLocalRecommendation = (
     weatherConsiderations.push("High wind speed - avoid foliar applications");
   }
   
-  // Calculate sustainability score (0-100)
-  let sustainabilityScore = 60; // Base score
+  // Calculate sustainability score (0-100) - more dynamic scoring
+  let sustainabilityScore = 40; // Lower base score for more variation
   
-  // Organic matter bonus
-  if (soilData.organicCarbon > 1.5) sustainabilityScore += 15;
-  else if (soilData.organicCarbon > 1.0) sustainabilityScore += 10;
+  // Soil health contribution (0-25 points)
+  const soilQualityScore = Math.min(25, 
+    (soilData.organicCarbon * 8) + // Organic carbon importance
+    (soilData.pH >= 6.0 && soilData.pH <= 7.5 ? 8 : 0) + // Optimal pH bonus
+    (soilData.soilType === 'loamy' ? 5 : 0) // Loamy soil bonus
+  );
+  sustainabilityScore += soilQualityScore;
   
-  // Precision application bonus
-  sustainabilityScore += 10; // For using soil testing
-  
-  // Weather-responsive farming bonus
-  sustainabilityScore += 10;
-  
-  // Reduce for high fertilizer use
+  // Fertilizer efficiency (0-20 points)
   const totalNutrients = finalRecommendation.nitrogen + finalRecommendation.phosphorus + finalRecommendation.potassium;
-  if (totalNutrients > 300) sustainabilityScore -= 10;
+  const fertilizerEfficiency = Math.max(0, 20 - (totalNutrients / 20)); // Lower usage = higher score
+  sustainabilityScore += fertilizerEfficiency;
   
-  // Crop health consideration
-  if (cropAnalysis && cropAnalysis.cropHealth === 'excellent') sustainabilityScore += 5;
+  // Weather adaptation (0-15 points)
+  const weatherScore = Math.min(15,
+    (weatherData.rainfall > 2 && weatherData.rainfall < 8 ? 8 : 3) + // Optimal rainfall
+    (weatherData.temperature > 20 && weatherData.temperature < 35 ? 7 : 2) // Optimal temperature
+  );
+  sustainabilityScore += weatherScore;
   
-  sustainabilityScore = Math.min(100, Math.max(0, sustainabilityScore));
+  // Crop health impact (0-20 points)
+  const cropHealthScore = cropAnalysis ? 
+    { 'excellent': 20, 'good': 15, 'fair': 8, 'poor': 2 }[cropAnalysis.cropHealth] || 0 : 10;
+  sustainabilityScore += cropHealthScore;
+  
+  sustainabilityScore = Math.min(100, Math.max(20, sustainabilityScore));
   
   // Estimate yield increase and cost
   const expectedYieldIncrease = Math.round(5 + (sustainabilityScore - 50) * 0.4); // 5-25% increase
