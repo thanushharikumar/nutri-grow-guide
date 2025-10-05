@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.ml-prediction]
 verify_jwt = false
+
+[functions.getFertilizerRecommendation]
+verify_jwt = false
