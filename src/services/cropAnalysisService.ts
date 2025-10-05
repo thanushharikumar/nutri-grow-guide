@@ -107,7 +107,7 @@ export const analyzeCropImage = async (imageFile: File): Promise<CropAnalysisRes
   return result;
 };
 
-// Validate if uploaded image contains crop/plant content
+// Validate if uploaded image contains crop/plant content using stricter criteria
 const validateCropImage = async (imageFile: File): Promise<boolean> => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -119,8 +119,7 @@ const validateCropImage = async (imageFile: File): Promise<boolean> => {
       canvas.height = img.height;
       ctx?.drawImage(img, 0, 0);
       
-      // Basic validation: check if image has green content (plants)
-      // In production, this would use actual computer vision
+      // Stricter validation using multiple criteria
       const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
       if (!imageData) {
         resolve(false);
@@ -128,23 +127,52 @@ const validateCropImage = async (imageFile: File): Promise<boolean> => {
       }
       
       let greenPixels = 0;
+      let strongGreenPixels = 0;
       let totalPixels = imageData.data.length / 4;
+      let colorDiversity = new Set<string>();
       
-      // Count pixels that are more green than red/blue (simple vegetation detection)
+      // Analyze pixel colors for vegetation patterns
       for (let i = 0; i < imageData.data.length; i += 4) {
         const red = imageData.data[i];
         const green = imageData.data[i + 1];
         const blue = imageData.data[i + 2];
+        const alpha = imageData.data[i + 3];
         
-        // Check for green-dominant pixels (vegetation indicator)
+        // Skip transparent pixels
+        if (alpha < 128) continue;
+        
+        // Track color diversity (reduce false positives from solid color images)
+        colorDiversity.add(`${Math.floor(red/10)}-${Math.floor(green/10)}-${Math.floor(blue/10)}`);
+        
+        // Check for green-dominant pixels (basic vegetation)
         if (green > red && green > blue && green > 50) {
           greenPixels++;
+          
+          // Check for strong vegetation signal (more confident)
+          if (green > red + 20 && green > blue + 20 && green > 80) {
+            strongGreenPixels++;
+          }
         }
       }
       
-      // Require at least 15% green pixels for crop images
+      // Stricter requirements:
+      // 1. At least 30% green pixels (up from 15%)
+      // 2. At least 15% strong green pixels (high confidence vegetation)
+      // 3. Sufficient color diversity (at least 50 different color groups to avoid solid colors)
       const greenPercentage = (greenPixels / totalPixels) * 100;
-      resolve(greenPercentage >= 15);
+      const strongGreenPercentage = (strongGreenPixels / totalPixels) * 100;
+      const hasDiversity = colorDiversity.size >= 50;
+      
+      const isValid = greenPercentage >= 30 && strongGreenPercentage >= 15 && hasDiversity;
+      
+      console.log('Image validation:', {
+        greenPercentage: greenPercentage.toFixed(2),
+        strongGreenPercentage: strongGreenPercentage.toFixed(2),
+        colorDiversity: colorDiversity.size,
+        isValid
+      });
+      
+      resolve(isValid);
     };
     
     img.onerror = () => resolve(false);
