@@ -300,35 +300,44 @@ const generateLocalRecommendation = (
     weatherConsiderations.push("High wind speed - avoid foliar applications");
   }
   
-  // Calculate sustainability score (0-100) - more dynamic scoring
-  let sustainabilityScore = 40; // Lower base score for more variation
+  // Calculate sustainability score dynamically (0-100) based on multiple factors
+  let sustainabilityScore = 30; // Lower base for more variation
   
-  // Soil health contribution (0-25 points)
-  const soilQualityScore = Math.min(25, 
-    (soilData.organicCarbon * 8) + // Organic carbon importance
-    (soilData.pH >= 6.0 && soilData.pH <= 7.5 ? 8 : 0) + // Optimal pH bonus
-    (soilData.soilType === 'loamy' ? 5 : 0) // Loamy soil bonus
+  // 1. Soil health contribution (0-25 points)
+  const soilQualityScore = Math.min(25,
+    (soilData.organicCarbon * 8) + // Organic carbon importance (0-12 points)
+    (soilData.pH >= 6.0 && soilData.pH <= 7.5 ? 8 : Math.max(0, 8 - Math.abs(soilData.pH - 6.75) * 3)) + // pH optimality (0-8 points)
+    (soilData.soilType === 'loamy' ? 5 : soilData.soilType === 'silty' ? 3 : 0) // Soil type bonus (0-5 points)
   );
   sustainabilityScore += soilQualityScore;
   
-  // Fertilizer efficiency (0-20 points)
+  // 2. Fertilizer efficiency (0-25 points) - rewards lower usage
   const totalNutrients = finalRecommendation.nitrogen + finalRecommendation.phosphorus + finalRecommendation.potassium;
-  const fertilizerEfficiency = Math.max(0, 20 - (totalNutrients / 20)); // Lower usage = higher score
+  const fertilizerEfficiency = Math.max(0, 25 - (totalNutrients / 15)); // Lower usage = higher score
   sustainabilityScore += fertilizerEfficiency;
   
-  // Weather adaptation (0-15 points)
+  // 3. Existing nutrient utilization (0-15 points) - rewards using soil's existing nutrients
+  const nutrientUtilization = Math.min(15,
+    (soilData.nitrogen / 300) * 5 +
+    (soilData.phosphorus / 50) * 5 +
+    (soilData.potassium / 200) * 5
+  );
+  sustainabilityScore += nutrientUtilization;
+  
+  // 4. Weather adaptation (0-15 points) - optimal conditions
   const weatherScore = Math.min(15,
-    (weatherData.rainfall > 2 && weatherData.rainfall < 8 ? 8 : 3) + // Optimal rainfall
-    (weatherData.temperature > 20 && weatherData.temperature < 35 ? 7 : 2) // Optimal temperature
+    (weatherData.rainfall > 2 && weatherData.rainfall < 8 ? 8 : Math.max(0, 8 - Math.abs(weatherData.rainfall - 5))) + // Optimal rainfall
+    (weatherData.temperature > 20 && weatherData.temperature < 35 ? 7 : Math.max(0, 7 - Math.abs(weatherData.temperature - 27.5) * 0.3)) // Optimal temperature
   );
   sustainabilityScore += weatherScore;
   
-  // Crop health impact (0-20 points)
-  const cropHealthScore = cropAnalysis ? 
-    { 'excellent': 20, 'good': 15, 'fair': 8, 'poor': 2 }[cropAnalysis.cropHealth] || 0 : 10;
+  // 5. Crop health impact (0-20 points)
+  const cropHealthScore = cropAnalysis ?
+    { 'excellent': 20, 'good': 14, 'fair': 7, 'poor': 0 }[cropAnalysis.cropHealth] || 10 : 10;
   sustainabilityScore += cropHealthScore;
   
-  sustainabilityScore = Math.min(100, Math.max(20, sustainabilityScore));
+  // Ensure score stays within 0-100 range
+  sustainabilityScore = Math.min(100, Math.max(0, Math.round(sustainabilityScore)));
   
   // Estimate yield increase and cost
   const expectedYieldIncrease = Math.round(5 + (sustainabilityScore - 50) * 0.4); // 5-25% increase
