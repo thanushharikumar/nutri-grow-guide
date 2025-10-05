@@ -209,13 +209,10 @@ const Recommendation = () => {
             title: "Crop analysis complete",
             description: `Crop health assessed as ${cropAnalysisResult.cropHealth}`,
           });
-        } catch (analysisError) {
+        } catch (analysisError: any) {
           console.error('Crop analysis failed:', analysisError);
-          toast({
-            title: "Crop analysis unavailable",
-            description: "Proceeding with soil and weather analysis only",
-            variant: "destructive",
-          });
+          // Stop the entire process if image validation fails
+          throw new Error(analysisError?.message || "Please upload a valid crop image with visible plants or vegetation");
         }
       }
 
@@ -250,11 +247,11 @@ const Recommendation = () => {
         description: `Sustainability score: ${recommendation.sustainabilityScore}%`,
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Recommendation generation failed:', error);
       toast({
         title: "Analysis failed",
-        description: "Please check your inputs and try again",
+        description: error?.message || "Please check your inputs and try again",
         variant: "destructive",
       });
     } finally {

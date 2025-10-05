@@ -16,11 +16,16 @@ export interface CropAnalysisResult {
 }
 
 export const analyzeCropImage = async (imageFile: File): Promise<CropAnalysisResult> => {
+  console.log('Starting crop image analysis for:', imageFile.name);
+  
   // Validate image is actually a crop/plant image
   const isValidCropImage = await validateCropImage(imageFile);
   if (!isValidCropImage) {
+    console.error('Image validation failed - not a valid crop image');
     throw new Error('Please upload a clear image of crops or plants. The uploaded image does not appear to contain agricultural content.');
   }
+  
+  console.log('Image validation passed - proceeding with analysis');
 
   // Simulate API processing time
   await new Promise(resolve => setTimeout(resolve, 2000));
