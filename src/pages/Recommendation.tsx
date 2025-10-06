@@ -232,11 +232,38 @@ const Recommendation = () => {
         organicCarbon: data.organicCarbon,
       };
 
+      // Get location coordinates if available
+      let latitude: number | undefined;
+      let longitude: number | undefined;
+      try {
+        const coords = await getUserLocation();
+        latitude = coords.lat;
+        longitude = coords.lon;
+      } catch {
+        // Use weather data location if available
+        if (weather.location) {
+          console.log('Using weather location fallback');
+        }
+      }
+
+      // Convert image to base64 if provided
+      let imageData: string | undefined;
+      if (cropImage) {
+        imageData = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.readAsDataURL(cropImage);
+        });
+      }
+
       const recommendation = await generateRecommendation(
         data.cropType,
         soilData,
         weather,
-        cropAnalysisResult
+        cropAnalysisResult,
+        imageData,
+        latitude,
+        longitude
       );
 
       setAnalysisProgress(100);
