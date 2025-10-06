@@ -47,35 +47,41 @@ export const generateRecommendation = async (
   cropType: string,
   soilData: SoilData,
   weatherData: WeatherData,
-  cropAnalysis?: CropAnalysisResult
+  cropAnalysis?: CropAnalysisResult,
+  imageData?: string,
+  latitude?: number,
+  longitude?: number
 ): Promise<RecommendationResult> => {
   try {
-    // First, get ML prediction
-    const mlPrediction = await getMLPrediction(cropType, soilData, weatherData, cropAnalysis);
+    console.log('Calling getFertilizerRecommendation edge function...');
     
-    // Call Supabase edge function for recommendation generation with ML prediction
-    const { data, error } = await supabase.functions.invoke('generate-recommendation', {
+    // Call the new unified edge function
+    const { data, error } = await supabase.functions.invoke('getFertilizerRecommendation', {
       body: { 
         cropType,
-        soilData,
-        weatherData,
-        cropAnalysis,
-        mlPrediction // Include ML prediction data
+        soilType: soilData.soilType,
+        pH: soilData.pH,
+        nitrogen: soilData.nitrogen,
+        phosphorus: soilData.phosphorus,
+        potassium: soilData.potassium,
+        organicCarbon: soilData.organicCarbon,
+        latitude,
+        longitude,
+        imageData
       }
     });
 
     if (error) {
-      console.error('Error calling recommendation function:', error);
-      // Fallback to local generation with ML prediction data
-      return generateLocalRecommendation(cropType, soilData, weatherData, cropAnalysis, mlPrediction);
+      console.error('Error calling getFertilizerRecommendation:', error);
+      throw error;
     }
 
     if (!data) {
-      console.warn('No recommendation data received from edge function');
-      // Fallback to local generation with ML prediction data
-      return generateLocalRecommendation(cropType, soilData, weatherData, cropAnalysis, mlPrediction);
+      console.warn('No data received from edge function');
+      throw new Error('No recommendation data received');
     }
 
+    console.log('Recommendation received from edge function:', data);
     return data as RecommendationResult;
   } catch (error) {
     console.error('Error generating recommendation:', error);
