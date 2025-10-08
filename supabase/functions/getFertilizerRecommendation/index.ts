@@ -35,23 +35,24 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabase = createClient(supabaseUrl!, supabaseKey!);
 
-    // 1️⃣ Validate crop image using simple color analysis
+    // 1️⃣ Validate crop image using Google Vision API
     let imageValid = true;
     let imageValidationMessage = "";
+    let nutrientHint = "";
     
     if (imageData) {
       try {
-        // Basic image validation - check for green vegetation
-        const greenPixelRatio = calculateGreenPixels(imageData);
-        imageValid = greenPixelRatio > 0.15; // At least 15% green pixels
+        const visionResult = await validateCropImageWithVision(imageData);
+        imageValid = visionResult.valid;
+        nutrientHint = visionResult.nutrientHint || "";
         
         if (!imageValid) {
-          imageValidationMessage = `Image validation failed: Only ${(greenPixelRatio * 100).toFixed(1)}% green vegetation detected. Please upload a clear crop image.`;
+          imageValidationMessage = visionResult.reason || "Invalid crop image detected.";
         }
         
-        console.log('Image validation result:', { greenPixelRatio, imageValid });
+        console.log('Vision API validation result:', { imageValid, nutrientHint });
       } catch (err) {
-        console.error('Image validation error:', err);
+        console.error('Vision API error:', err);
         imageValid = false;
         imageValidationMessage = "Unable to validate image. Please try again.";
       }
@@ -128,7 +129,7 @@ serve(async (req) => {
       console.error('ML prediction error:', err);
     }
 
-    // 4️⃣ Compute fertilizer recommendation
+    // 4️⃣ Compute fertilizer recommendation with nutrient deficiency adjustments
     const cropRequirements: Record<string, { nitrogen: number; phosphorus: number; potassium: number }> = {
       rice: { nitrogen: 120, phosphorus: 60, potassium: 40 },
       wheat: { nitrogen: 150, phosphorus: 80, potassium: 60 },
@@ -137,6 +138,20 @@ serve(async (req) => {
     };
     
     let baseRecommendation = cropRequirements[cropType.toLowerCase()] || cropRequirements.rice;
+    
+    // Apply nutrient deficiency adjustments from Vision API
+    if (nutrientHint.toLowerCase().includes("nitrogen")) {
+      baseRecommendation.nitrogen *= 1.15;
+      console.log('Nitrogen deficiency detected - increasing N by 15%');
+    }
+    if (nutrientHint.toLowerCase().includes("phosphorus")) {
+      baseRecommendation.phosphorus *= 1.12;
+      console.log('Phosphorus deficiency detected - increasing P by 12%');
+    }
+    if (nutrientHint.toLowerCase().includes("potassium")) {
+      baseRecommendation.potassium *= 1.12;
+      console.log('Potassium deficiency detected - increasing K by 12%');
+    }
     
     // Adjust based on soil analysis
     const pHAdjustment = pH < 6.0 ? 1.1 : pH > 8.0 ? 0.9 : 1.0;
@@ -321,7 +336,8 @@ serve(async (req) => {
         expectedYieldIncrease,
         costEstimate,
         weather: weatherData,
-        mlPrediction: mlPrediction?.prediction
+        mlPrediction: mlPrediction?.prediction,
+        nutrientAnalysis: nutrientHint || "Normal leaf color detected"
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
@@ -339,18 +355,123 @@ serve(async (req) => {
   }
 });
 
-// Helper function for basic green pixel detection
-function calculateGreenPixels(imageData: string): number {
-  // This is a simplified version - in production use proper image analysis
-  // For now, return a mock value that requires actual image data
-  try {
-    // Basic validation that we have image data
-    if (!imageData || imageData.length < 100) {
-      return 0;
-    }
-    // Mock green pixel calculation
-    return 0.25; // 25% green pixels
-  } catch {
-    return 0;
+/**
+ * Validate crop image using Google Vision API
+ */
+async function validateCropImageWithVision(imageData: string): Promise<{
+  valid: boolean;
+  reason?: string;
+  nutrientHint?: string;
+}> {
+  const visionApiKey = Deno.env.get("GOOGLE_VISION_API_KEY");
+  
+  if (!visionApiKey) {
+    console.warn("GOOGLE_VISION_API_KEY not set - skipping Vision API validation");
+    return { valid: true, nutrientHint: "Vision API not configured" };
   }
+
+  try {
+    // Remove data URL prefix if present
+    const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '');
+    
+    const response = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${visionApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
+            image: { content: base64Image },
+            features: [
+              { type: 'LABEL_DETECTION', maxResults: 15 },
+              { type: 'IMAGE_PROPERTIES', maxResults: 5 }
+            ]
+          }]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Vision API error:', response.status, errorText);
+      return { valid: false, reason: "Image validation failed" };
+    }
+
+    const data = await response.json();
+    const annotations = data.responses?.[0];
+    
+    if (!annotations) {
+      return { valid: false, reason: "Unable to analyze image" };
+    }
+
+    // Check for plant-related labels
+    const labels = annotations.labelAnnotations?.map((l: any) => 
+      l.description.toLowerCase()
+    ) || [];
+    
+    const plantKeywords = ['plant', 'leaf', 'crop', 'vegetation', 'agriculture', 
+                          'field', 'green', 'grass', 'tree', 'flower'];
+    const hasPlantContent = labels.some((label: string) =>
+      plantKeywords.some(keyword => label.includes(keyword))
+    );
+
+    if (!hasPlantContent) {
+      return { 
+        valid: false, 
+        reason: "Image does not appear to contain plant or crop content" 
+      };
+    }
+
+    // Analyze dominant color for nutrient deficiency indicators
+    const dominantColors = annotations.imagePropertiesAnnotation?.dominantColors?.colors || [];
+    const nutrientHint = analyzeLeafColorFromVision(dominantColors);
+
+    console.log('Vision API labels:', labels);
+    console.log('Nutrient analysis:', nutrientHint);
+
+    return { 
+      valid: true, 
+      nutrientHint 
+    };
+
+  } catch (error) {
+    console.error('Vision API request failed:', error);
+    return { valid: false, reason: "Image validation service unavailable" };
+  }
+}
+
+/**
+ * Analyze dominant colors to detect nutrient deficiencies
+ */
+function analyzeLeafColorFromVision(colors: any[]): string {
+  if (!colors || colors.length === 0) {
+    return "Normal leaf color";
+  }
+
+  const topColor = colors[0]?.color;
+  if (!topColor) return "Normal leaf color";
+
+  const { red = 0, green = 0, blue = 0 } = topColor;
+
+  // Nitrogen deficiency: Yellowing (low green, high red/yellow)
+  if (green < 100 && red > 120 && blue < 100) {
+    return "Nitrogen deficiency detected - yellowing leaves";
+  }
+
+  // Phosphorus deficiency: Purple/dark tint (high blue)
+  if (blue > 130 && green < 110) {
+    return "Phosphorus deficiency detected - purple/dark discoloration";
+  }
+
+  // Potassium deficiency: Pale/washed out (all values high but low saturation)
+  if (red > 150 && green > 140 && blue > 140) {
+    return "Potassium deficiency detected - pale/chlorotic leaves";
+  }
+
+  // Healthy green vegetation
+  if (green > 100 && green > red && green > blue) {
+    return "Healthy leaf color detected";
+  }
+
+  return "Normal leaf color";
 }
