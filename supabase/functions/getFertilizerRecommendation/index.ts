@@ -25,7 +25,7 @@ serve(async (req) => {
       latitude,
       longitude,
       imageUrl,
-      imageData
+      imageBase64
     } = body;
 
     console.log('Received recommendation request:', { cropType, soilType, latitude, longitude });
@@ -40,9 +40,9 @@ serve(async (req) => {
     let imageValidationMessage = "";
     let nutrientHint = "";
     
-    if (imageData) {
+    if (imageBase64) {
       try {
-        const visionResult = await validateCropImageWithVision(imageData);
+        const visionResult = await validateCropImageWithVision(imageBase64);
         imageValid = visionResult.valid;
         nutrientHint = visionResult.nutrientHint || "";
         
@@ -358,7 +358,7 @@ serve(async (req) => {
 /**
  * Validate crop image using Google Vision API
  */
-async function validateCropImageWithVision(imageData: string): Promise<{
+async function validateCropImageWithVision(imageBase64: string): Promise<{
   valid: boolean;
   reason?: string;
   nutrientHint?: string;
@@ -371,8 +371,8 @@ async function validateCropImageWithVision(imageData: string): Promise<{
   }
 
   try {
-    // Remove data URL prefix if present
-    const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '');
+    // imageBase64 is already without data URL prefix (stripped by frontend)
+    const base64Image = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     
     const response = await fetch(
       `https://vision.googleapis.com/v1/images:annotate?key=${visionApiKey}`,

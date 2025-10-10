@@ -246,25 +246,27 @@ const Recommendation = () => {
         }
       }
 
-      // Convert image to base64 if provided
-      let imageData: string | undefined;
+      // Compress and convert image to base64 if provided
+      let imageBase64: string | null = null;
       if (cropImage) {
-        imageData = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(cropImage);
-        });
+        const { prepareImageFile } = await import('@/services/imageUtils');
+        imageBase64 = await prepareImageFile(cropImage, 800, 0.7);
       }
 
-      const recommendation = await generateRecommendation(
-        data.cropType,
-        soilData,
-        weather,
-        cropAnalysisResult,
-        imageData,
+      // Call the edge function directly with compressed image
+      const { callRecommendationApi } = await import('@/services/imageUtils');
+      const recommendation = await callRecommendationApi({
+        cropType: data.cropType,
+        soilType: soilData.soilType,
+        pH: soilData.pH,
+        nitrogen: soilData.nitrogen,
+        phosphorus: soilData.phosphorus,
+        potassium: soilData.potassium,
+        organicCarbon: soilData.organicCarbon,
         latitude,
-        longitude
-      );
+        longitude,
+        imageBase64
+      });
 
       setAnalysisProgress(100);
       setResults(recommendation);
