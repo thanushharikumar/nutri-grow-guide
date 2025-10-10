@@ -6,6 +6,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const VISION_KEY = Deno.env.get("GOOGLE_VISION_API_KEY")!;
+const WEATHER_KEY = Deno.env.get("OPENWEATHER_API_KEY") || "";
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error("Missing required environment variables.");
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -24,66 +35,72 @@ serve(async (req) => {
       organicCarbon,
       latitude,
       longitude,
-      imageUrl,
       imageBase64
     } = body;
 
-    console.log('Received recommendation request:', { cropType, soilType, latitude, longitude });
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supabase = createClient(supabaseUrl!, supabaseKey!);
-
-    // 1️⃣ Validate crop image using Google Vision API
-    let imageValid = true;
-    let imageValidationMessage = "";
-    let nutrientHint = "";
-    
-    if (imageBase64) {
-      try {
-        const visionResult = await validateCropImageWithVision(imageBase64);
-        imageValid = visionResult.valid;
-        nutrientHint = visionResult.nutrientHint || "";
-        
-        if (!imageValid) {
-          imageValidationMessage = visionResult.reason || "Invalid crop image detected.";
-        }
-        
-        console.log('Vision API validation result:', { imageValid, nutrientHint });
-      } catch (err) {
-        console.error('Vision API error:', err);
-        imageValid = false;
-        imageValidationMessage = "Unable to validate image. Please try again.";
-      }
-    }
-
-    if (!imageValid) {
+    if (!cropType || !soilType) {
       return new Response(
-        JSON.stringify({ 
-          error: imageValidationMessage || "Invalid image - please upload a clear crop image." 
-        }), 
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        JSON.stringify({ error: "cropType and soilType required" }), 
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 2️⃣ Fetch real-time weather data
-    let weatherData = {
-      temperature: 28,
-      rainfall: 0,
-      humidity: 60,
-      windSpeed: 5,
-      description: "Clear sky"
-    };
+    console.log('Received recommendation request:', { cropType, soilType, latitude, longitude });
 
-    if (latitude && longitude) {
+    // Compute image hash for caching
+    const imgHash = imageBase64 ? hashString(imageBase64.slice(0, 200)) : null;
+
+    // 1️⃣ Check cache for Vision API result
+    let visionResult: any = null;
+    if (imgHash) {
+      const { data: cacheRows } = await supabase
+        .from("image_analysis_cache")
+        .select("vision_result")
+        .eq("image_hash", imgHash)
+        .limit(1);
+      
+      if (cacheRows && cacheRows.length) {
+        visionResult = cacheRows[0].vision_result;
+        console.log('Using cached Vision API result');
+      }
+    }
+
+    // 2️⃣ Call Vision API if not cached
+    if (!visionResult && imageBase64) {
       try {
-        const openWeatherKey = Deno.env.get("OPENWEATHER_API_KEY");
+        visionResult = await callVisionApi(imageBase64);
+        
+        if (!visionResult.isPlant) {
+          return new Response(
+            JSON.stringify({ error: "Invalid image - no plant detected" }), 
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        // Store in cache
+        if (imgHash) {
+          await supabase.from("image_analysis_cache").insert({
+            image_hash: imgHash,
+            vision_result: visionResult,
+          });
+        }
+        
+        console.log('Vision API result:', visionResult);
+      } catch (err) {
+        console.error('Vision API error:', err);
+        return new Response(
+          JSON.stringify({ error: "Unable to validate image. Please try again." }), 
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // 3️⃣ Fetch real-time weather data
+    let weatherData: any = null;
+    if (latitude && longitude && WEATHER_KEY) {
+      try {
         const weatherResp = await fetch(
-          `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${openWeatherKey}&units=metric`
+          `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${WEATHER_KEY}&units=metric`
         );
         
         if (weatherResp.ok) {
@@ -99,34 +116,18 @@ serve(async (req) => {
         }
       } catch (err) {
         console.error('Weather API error:', err);
-        // Continue with default weather data
       }
     }
 
-    // 3️⃣ Get ML prediction
-    let mlPrediction = null;
-    try {
-      const { data: mlData, error: mlError } = await supabase.functions.invoke('ml-prediction', {
-        body: {
-          N: nitrogen,
-          P: phosphorus,
-          K: potassium,
-          pH: pH,
-          organicCarbon: organicCarbon,
-          cropType: cropType,
-          soilType: soilType,
-          temperature: weatherData.temperature,
-          rainfall: weatherData.rainfall,
-          humidity: weatherData.humidity
-        }
-      });
-
-      if (!mlError && mlData) {
-        mlPrediction = mlData;
-        console.log('ML Prediction received:', mlPrediction);
-      }
-    } catch (err) {
-      console.error('ML prediction error:', err);
+    // Default weather if not fetched
+    if (!weatherData) {
+      weatherData = {
+        temperature: 28,
+        rainfall: 0,
+        humidity: 60,
+        windSpeed: 5,
+        description: "Clear sky"
+      };
     }
 
     // 4️⃣ Compute fertilizer recommendation with nutrient deficiency adjustments
@@ -140,17 +141,20 @@ serve(async (req) => {
     let baseRecommendation = cropRequirements[cropType.toLowerCase()] || cropRequirements.rice;
     
     // Apply nutrient deficiency adjustments from Vision API
-    if (nutrientHint.toLowerCase().includes("nitrogen")) {
-      baseRecommendation.nitrogen *= 1.15;
-      console.log('Nitrogen deficiency detected - increasing N by 15%');
-    }
-    if (nutrientHint.toLowerCase().includes("phosphorus")) {
-      baseRecommendation.phosphorus *= 1.12;
-      console.log('Phosphorus deficiency detected - increasing P by 12%');
-    }
-    if (nutrientHint.toLowerCase().includes("potassium")) {
-      baseRecommendation.potassium *= 1.12;
-      console.log('Potassium deficiency detected - increasing K by 12%');
+    if (visionResult && visionResult.deficiency) {
+      const def = visionResult.deficiency.toLowerCase();
+      if (def.includes("nitrogen")) {
+        baseRecommendation.nitrogen *= 1.15;
+        console.log('Nitrogen deficiency detected - increasing N by 15%');
+      }
+      if (def.includes("phosphorus")) {
+        baseRecommendation.phosphorus *= 1.12;
+        console.log('Phosphorus deficiency detected - increasing P by 12%');
+      }
+      if (def.includes("potassium")) {
+        baseRecommendation.potassium *= 1.12;
+        console.log('Potassium deficiency detected - increasing K by 12%');
+      }
     }
     
     // Adjust based on soil analysis
@@ -318,7 +322,8 @@ serve(async (req) => {
         output: {
           fertilizer: finalRecommendation,
           sustainabilityScore,
-          mlPrediction
+          visionResult,
+          weather: weatherData
         }
       });
     } catch (err) {
@@ -336,8 +341,7 @@ serve(async (req) => {
         expectedYieldIncrease,
         costEstimate,
         weather: weatherData,
-        mlPrediction: mlPrediction?.prediction,
-        nutrientAnalysis: nutrientHint || "Normal leaf color detected"
+        nutrientAnalysis: visionResult?.deficiency || "Normal leaf color detected"
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
@@ -356,122 +360,64 @@ serve(async (req) => {
 });
 
 /**
- * Validate crop image using Google Vision API
+ * Call Google Vision API to analyze crop image
  */
-async function validateCropImageWithVision(imageBase64: string): Promise<{
-  valid: boolean;
-  reason?: string;
-  nutrientHint?: string;
-}> {
-  const visionApiKey = Deno.env.get("GOOGLE_VISION_API_KEY");
-  
-  if (!visionApiKey) {
+async function callVisionApi(base64body: string) {
+  if (!VISION_KEY) {
     console.warn("GOOGLE_VISION_API_KEY not set - skipping Vision API validation");
-    return { valid: true, nutrientHint: "Vision API not configured" };
+    return { isPlant: false };
   }
 
-  try {
-    // imageBase64 is already without data URL prefix (stripped by frontend)
-    const base64Image = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-    
-    const response = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${visionApiKey}`,
+  const body = {
+    requests: [
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requests: [{
-            image: { content: base64Image },
-            features: [
-              { type: 'LABEL_DETECTION', maxResults: 15 },
-              { type: 'IMAGE_PROPERTIES', maxResults: 5 }
-            ]
-          }]
-        })
+        image: { content: base64body },
+        features: [
+          { type: "LABEL_DETECTION", maxResults: 10 },
+          { type: "IMAGE_PROPERTIES", maxResults: 1 }
+        ]
       }
-    );
+    ]
+  };
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Vision API error:', response.status, errorText);
-      return { valid: false, reason: "Image validation failed" };
-    }
+  const res = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${VISION_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
 
-    const data = await response.json();
-    const annotations = data.responses?.[0];
-    
-    if (!annotations) {
-      return { valid: false, reason: "Unable to analyze image" };
-    }
-
-    // Check for plant-related labels
-    const labels = annotations.labelAnnotations?.map((l: any) => 
-      l.description.toLowerCase()
-    ) || [];
-    
-    const plantKeywords = ['plant', 'leaf', 'crop', 'vegetation', 'agriculture', 
-                          'field', 'green', 'grass', 'tree', 'flower'];
-    const hasPlantContent = labels.some((label: string) =>
-      plantKeywords.some(keyword => label.includes(keyword))
-    );
-
-    if (!hasPlantContent) {
-      return { 
-        valid: false, 
-        reason: "Image does not appear to contain plant or crop content" 
-      };
-    }
-
-    // Analyze dominant color for nutrient deficiency indicators
-    const dominantColors = annotations.imagePropertiesAnnotation?.dominantColors?.colors || [];
-    const nutrientHint = analyzeLeafColorFromVision(dominantColors);
-
-    console.log('Vision API labels:', labels);
-    console.log('Nutrient analysis:', nutrientHint);
-
-    return { 
-      valid: true, 
-      nutrientHint 
-    };
-
-  } catch (error) {
-    console.error('Vision API request failed:', error);
-    return { valid: false, reason: "Image validation service unavailable" };
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error("Vision API error: " + text);
   }
+
+  const json = await res.json();
+  const resp = json.responses?.[0] || {};
+  const labels = (resp.labelAnnotations || []).map((l: any) => (l.description || "").toLowerCase());
+  const validKeywords = ["plant", "leaf", "crop", "agriculture", "vegetation", "maize", "rice", "wheat", "millet"];
+  const isPlant = labels.some((lbl: string) => validKeywords.some(k => lbl.includes(k)));
+  const colors = resp.imagePropertiesAnnotation?.dominantColors?.colors || [];
+  
+  let avgGreen = 0;
+  if (colors.length) {
+    avgGreen = Math.round(colors.reduce((acc: number, c: any) => acc + (c.color?.green || 0), 0) / colors.length);
+  }
+
+  let deficiency = "Healthy";
+  if (avgGreen < 70) deficiency = "Nitrogen deficiency likely";
+  else if (avgGreen < 110) deficiency = "Phosphorus/pale stress possible";
+  else if (avgGreen < 150) deficiency = "Potassium stress possible";
+
+  return { labels, isPlant, avgGreen, deficiency };
 }
 
 /**
- * Analyze dominant colors to detect nutrient deficiencies
+ * Simple hash function for image fingerprinting
  */
-function analyzeLeafColorFromVision(colors: any[]): string {
-  if (!colors || colors.length === 0) {
-    return "Normal leaf color";
+function hashString(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h) + s.charCodeAt(i);
   }
-
-  const topColor = colors[0]?.color;
-  if (!topColor) return "Normal leaf color";
-
-  const { red = 0, green = 0, blue = 0 } = topColor;
-
-  // Nitrogen deficiency: Yellowing (low green, high red/yellow)
-  if (green < 100 && red > 120 && blue < 100) {
-    return "Nitrogen deficiency detected - yellowing leaves";
-  }
-
-  // Phosphorus deficiency: Purple/dark tint (high blue)
-  if (blue > 130 && green < 110) {
-    return "Phosphorus deficiency detected - purple/dark discoloration";
-  }
-
-  // Potassium deficiency: Pale/washed out (all values high but low saturation)
-  if (red > 150 && green > 140 && blue > 140) {
-    return "Potassium deficiency detected - pale/chlorotic leaves";
-  }
-
-  // Healthy green vegetation
-  if (green > 100 && green > red && green > blue) {
-    return "Healthy leaf color detected";
-  }
-
-  return "Normal leaf color";
+  return String(h >>> 0);
 }
