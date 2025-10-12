@@ -17,6 +17,86 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ML model rules (paste exported JSON from train_models_with_export.py)
+// After training, copy contents from models/*.json files here
+const ML_RULES = {
+  preprocessing: {
+    numeric_features: ["nitrogen", "phosphorus", "potassium", "ph"],
+    means: [50, 30, 30, 6.5],
+    scales: [20, 15, 15, 1.0],
+    categorical_mappings: {}
+  },
+  // Paste regressor_N_rules.json content here
+  n_regressor: null,
+  // Paste regressor_P2O5_rules.json content here
+  p_regressor: null,
+  // Paste regressor_K2O_rules.json content here
+  k_regressor: null
+};
+
+// ML prediction helper - evaluates decision tree rules
+function predictWithRules(features: number[], rules: any): number | null {
+  if (!rules || !rules.trees || rules.trees.length === 0) return null;
+  
+  const predictions: number[] = [];
+  
+  // Average predictions from multiple trees
+  for (const tree of rules.trees) {
+    for (const rule of tree) {
+      let matches = true;
+      
+      // Check all conditions
+      for (const cond of rule.conditions) {
+        const featureName = cond.feature.toLowerCase();
+        let featureIdx = -1;
+        
+        // Map feature name to index
+        if (featureName.includes("nitrogen") || featureName.includes("n_ppm")) featureIdx = 0;
+        else if (featureName.includes("phosphorus") || featureName.includes("p_ppm")) featureIdx = 1;
+        else if (featureName.includes("potassium") || featureName.includes("k_ppm")) featureIdx = 2;
+        else if (featureName.includes("ph")) featureIdx = 3;
+        
+        if (featureIdx === -1) continue;
+        
+        const value = features[featureIdx] || 0;
+        
+        if (cond.op === "<=") {
+          if (value > cond.value) matches = false;
+        } else if (cond.op === ">") {
+          if (value <= cond.value) matches = false;
+        }
+        
+        if (!matches) break;
+      }
+      
+      if (matches) {
+        predictions.push(rule.prediction);
+        break;
+      }
+    }
+  }
+  
+  // Return average prediction
+  return predictions.length > 0 
+    ? Math.round(predictions.reduce((a, b) => a + b) / predictions.length)
+    : null;
+}
+
+// Preprocess features for ML model
+function preprocessFeatures(nitrogen: number, phosphorus: number, potassium: number, pH: number) {
+  const { means, scales } = ML_RULES.preprocessing;
+  
+  const raw = [
+    nitrogen || means[0],
+    phosphorus || means[1],
+    potassium || means[2],
+    pH || means[3]
+  ];
+  
+  // Normalize features
+  return raw.map((val, i) => (val - means[i]) / scales[i]);
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -130,7 +210,15 @@ serve(async (req) => {
       };
     }
 
-    // 4️⃣ Compute fertilizer recommendation with nutrient deficiency adjustments
+    // 4️⃣ Get ML predictions if available
+    const mlFeatures = preprocessFeatures(nitrogen, phosphorus, potassium, pH);
+    const mlN = predictWithRules(mlFeatures, ML_RULES.n_regressor);
+    const mlP = predictWithRules(mlFeatures, ML_RULES.p_regressor);
+    const mlK = predictWithRules(mlFeatures, ML_RULES.k_regressor);
+    
+    console.log('ML predictions:', { mlN, mlP, mlK });
+    
+    // Compute fertilizer recommendation with ML + rule-based fallback
     const cropRequirements: Record<string, { nitrogen: number; phosphorus: number; potassium: number }> = {
       rice: { nitrogen: 120, phosphorus: 60, potassium: 40 },
       wheat: { nitrogen: 150, phosphorus: 80, potassium: 60 },
@@ -138,7 +226,12 @@ serve(async (req) => {
       millets: { nitrogen: 60, phosphorus: 40, potassium: 30 }
     };
     
-    let baseRecommendation = cropRequirements[cropType.toLowerCase()] || cropRequirements.rice;
+    // Use ML predictions if available, otherwise fall back to rule-based
+    let baseRecommendation = {
+      nitrogen: mlN || cropRequirements[cropType.toLowerCase()]?.nitrogen || cropRequirements.rice.nitrogen,
+      phosphorus: mlP || cropRequirements[cropType.toLowerCase()]?.phosphorus || cropRequirements.rice.phosphorus,
+      potassium: mlK || cropRequirements[cropType.toLowerCase()]?.potassium || cropRequirements.rice.potassium
+    };
     
     // Apply nutrient deficiency adjustments from Vision API
     if (visionResult && visionResult.deficiency) {
@@ -321,6 +414,8 @@ serve(async (req) => {
         oc: organicCarbon,
         output: {
           fertilizer: finalRecommendation,
+          ml_predictions: { n: mlN, p: mlP, k: mlK },
+          ml_used: !!(mlN || mlP || mlK),
           sustainabilityScore,
           visionResult,
           weather: weatherData
@@ -334,6 +429,12 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         fertilizer: finalRecommendation,
+        ml_predictions: {
+          nitrogen_kg_per_ha: mlN,
+          p2o5_kg_per_ha: mlP,
+          k2o_kg_per_ha: mlK,
+          model_used: !!(mlN || mlP || mlK)
+        },
         products,
         sustainabilityScore,
         applicationSchedule,
