@@ -249,8 +249,13 @@ const Recommendation = () => {
       // Compress and convert image to base64 if provided
       let imageBase64: string | null = null;
       if (cropImage) {
+        toast({
+          title: "Processing image...",
+          description: "Compressing and preparing image for analysis",
+        });
         const { prepareImageFile } = await import('@/services/imageUtils');
         imageBase64 = await prepareImageFile(cropImage, 800, 0.7);
+        console.log('Image prepared, base64 length:', imageBase64?.length);
       }
 
       // Call the edge function directly with compressed image
@@ -267,6 +272,8 @@ const Recommendation = () => {
         longitude,
         imageBase64
       });
+
+      console.log('Edge function response:', recommendation);
 
       setAnalysisProgress(100);
       setResults(recommendation);
