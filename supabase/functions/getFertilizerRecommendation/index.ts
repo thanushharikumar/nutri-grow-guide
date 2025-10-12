@@ -125,7 +125,14 @@ serve(async (req) => {
       );
     }
 
-    console.log('Received recommendation request:', { cropType, soilType, latitude, longitude });
+    console.log('Received recommendation request:', { 
+      cropType, 
+      soilType, 
+      latitude, 
+      longitude, 
+      hasImage: !!imageBase64,
+      imageLength: imageBase64?.length 
+    });
 
     // Compute image hash for caching
     const imgHash = imageBase64 ? hashString(imageBase64.slice(0, 200)) : null;
@@ -147,12 +154,18 @@ serve(async (req) => {
 
     // 2️⃣ Call Vision API if not cached
     if (!visionResult && imageBase64) {
+      console.log('Calling Vision API for image analysis...');
       try {
         visionResult = await callVisionApi(imageBase64);
+        console.log('Vision API raw result:', JSON.stringify(visionResult, null, 2));
         
         if (!visionResult.isPlant) {
+          console.error('Image validation failed - not a plant:', visionResult.labels);
           return new Response(
-            JSON.stringify({ error: "Invalid image - no plant detected" }), 
+            JSON.stringify({ 
+              error: "Invalid image - no plant detected. Please upload an image showing crop plants or leaves.",
+              labels: visionResult.labels 
+            }), 
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -163,13 +176,19 @@ serve(async (req) => {
             image_hash: imgHash,
             vision_result: visionResult,
           });
+          console.log('Vision result cached with hash:', imgHash);
         }
         
-        console.log('Vision API result:', visionResult);
+        console.log('Vision API analysis complete:', {
+          isPlant: visionResult.isPlant,
+          avgGreen: visionResult.avgGreen,
+          deficiency: visionResult.deficiency,
+          detectedLabels: visionResult.labels?.slice(0, 5)
+        });
       } catch (err) {
         console.error('Vision API error:', err);
         return new Response(
-          JSON.stringify({ error: "Unable to validate image. Please try again." }), 
+          JSON.stringify({ error: `Image analysis failed: ${err.message}` }), 
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
