@@ -54,7 +54,7 @@ function showToast(title, description, type = 'default') {
 }
 
 // Image upload handler
-function handleImageUpload(event) {
+async function handleImageUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
   
@@ -70,15 +70,26 @@ function handleImageUpload(event) {
     return;
   }
   
-  cropImageFile = file;
-  
-  // Show preview
+  // Read and convert to base64
   const reader = new FileReader();
-  reader.onload = (e) => {
-    const preview = document.getElementById('image-preview');
-    const img = document.getElementById('preview-img');
+  reader.onload = async function(e) {
+    const base64Image = e.target.result.split(",")[1]; // Extract base64 only
+    
+    // Show preview
+    const img = new Image();
     img.src = e.target.result;
-    preview.classList.remove('hidden');
+    img.onload = async () => {
+      // Store base64 in cropImageFile for backend processing
+      cropImageFile = base64Image;
+      
+      // Update preview
+      const preview = document.getElementById('image-preview');
+      const previewImg = document.getElementById('preview-img');
+      previewImg.src = e.target.result;
+      preview.classList.remove('hidden');
+      
+      showToast('Image ready', 'Crop image loaded successfully', 'success');
+    };
   };
   reader.readAsDataURL(file);
 }
@@ -144,42 +155,57 @@ async function handleFormSubmit(event) {
   const progressFill = document.getElementById('progress-fill');
   
   try {
-    // Step 1: Weather data
+    // Step 1: Get location
     progressFill.style.width = '20%';
-    showToast('Getting weather data...', 'Fetching current weather conditions');
+    showToast('Getting location...', 'Fetching your coordinates');
     
-    let coordinates;
+    let coordinates = null;
     try {
       coordinates = await WeatherService.getUserLocation();
     } catch (error) {
-      coordinates = null;
+      console.log('Using default coordinates');
     }
     
-    currentWeather = await WeatherService.getWeatherData(coordinates);
+    // Step 2: Call backend Edge Function
+    progressFill.style.width = '50%';
+    showToast('Analyzing data...', 'Processing soil, weather, and image data');
     
-    // Step 2: Crop analysis (if image provided)
-    if (cropImageFile) {
-      progressFill.style.width = '50%';
-      showToast('Analyzing crop image...', 'AI is analyzing your crop for deficiencies');
-      currentCropAnalysis = await CropAnalysisService.analyzeCropImage(cropImageFile);
-    }
-    
-    // Step 3: Generate recommendations
-    progressFill.style.width = '80%';
-    showToast('Generating recommendations...', 'Creating personalized fertilizer plan');
-    
-    const soilData = {
+    const payload = {
+      cropType: data.cropType,
       soilType: data.soilType,
       pH: data.pH,
       nitrogen: data.nitrogen,
       phosphorus: data.phosphorus,
       potassium: data.potassium,
-      organicCarbon: data.organicCarbon
+      organicCarbon: data.organicCarbon,
+      latitude: coordinates?.lat || null,
+      longitude: coordinates?.lon || null,
+      imageBase64: cropImageFile || null
     };
     
-    currentResults = RecommendationEngine.generateRecommendation(
-      data.cropType, soilData, currentWeather, currentCropAnalysis
-    );
+    console.log('Calling recommendation API with payload:', { 
+      ...payload, 
+      imageBase64: cropImageFile ? `${cropImageFile.substring(0, 50)}...` : null 
+    });
+    
+    const response = await fetch('https://bkqzrfuyjugegxcqxwuo.supabase.co/functions/v1/getFertilizerRecommendation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrcXpyZnV5anVnZWd4Y3F4d3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyNDUyNDgsImV4cCI6MjA3MzgyMTI0OH0.Nj4n7IvvZutma2w-0leJa78n9l03rngzuxt9MQS5N5A'
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    progressFill.style.width = '80%';
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to generate recommendation');
+    }
+    
+    currentResults = await response.json();
+    console.log('Received recommendation:', currentResults);
     
     progressFill.style.width = '100%';
     
@@ -225,17 +251,22 @@ function displayResults() {
           <div class="nutrient-list">
             <div class="nutrient-item">
               <span>Nitrogen (N):</span>
-              <strong>${currentResults.fertilizer.nitrogen} kg/ha</strong>
+              <strong>${currentResults.fertilizer?.nitrogen || 0} kg/ha</strong>
             </div>
             <div class="nutrient-item">
               <span>Phosphorus (P₂O₅):</span>
-              <strong>${currentResults.fertilizer.phosphorus} kg/ha</strong>
+              <strong>${currentResults.fertilizer?.phosphorus || 0} kg/ha</strong>
             </div>
             <div class="nutrient-item">
               <span>Potassium (K₂O):</span>
-              <strong>${currentResults.fertilizer.potassium} kg/ha</strong>
+              <strong>${currentResults.fertilizer?.potassium || 0} kg/ha</strong>
             </div>
           </div>
+          ${currentResults.nutrientAnalysis ? `
+            <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.5rem;">
+              <strong>Image Analysis:</strong> ${currentResults.nutrientAnalysis}
+            </div>
+          ` : ''}
         </div>
       </div>
       
@@ -245,13 +276,46 @@ function displayResults() {
           <h3 class="card-title">Recommended Products</h3>
         </div>
         <div class="card-content">
-          ${currentResults.products.map(product => `
+          ${currentResults.products?.map(product => `
             <div class="product-item">
               <h4>${product.name}</h4>
               <p><strong>Quantity:</strong> ${product.quantity} kg/ha</p>
               <p><strong>Timing:</strong> ${product.applicationTiming}</p>
             </div>
-          `).join('')}
+          `).join('') || '<p>No products recommended</p>'}
+        </div>
+      </div>
+      
+      <!-- Weather Considerations -->
+      ${currentResults.weatherConsiderations?.length > 0 ? `
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Weather Considerations</h3>
+        </div>
+        <div class="card-content">
+          <ul style="list-style: disc; padding-left: 1.5rem;">
+            ${currentResults.weatherConsiderations.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+      ` : ''}
+      
+      <!-- Cost & Yield -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Expected Impact</h3>
+        </div>
+        <div class="card-content">
+          <div class="nutrient-list">
+            <div class="nutrient-item">
+              <span>Expected Yield Increase:</span>
+              <strong>${currentResults.expectedYieldIncrease || 0}%</strong>
+            </div>
+            <div class="nutrient-item">
+              <span>Estimated Cost:</span>
+              <strong>₹${currentResults.costEstimate || 0}/ha</strong>
+            </div>
+          </div>
         </div>
       </div>
     </div>
