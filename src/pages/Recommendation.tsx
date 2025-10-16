@@ -42,6 +42,7 @@ const Recommendation = () => {
   const [cropAnalysis, setCropAnalysis] = useState<CropAnalysisResult | null>(null);
   const [cropImage, setCropImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageValid, setImageValid] = useState<boolean | null>(null);
   const [soilHealthData, setSoilHealthData] = useState<SoilHealthData | null>(null);
   const [isLoadingSoilData, setIsLoadingSoilData] = useState(false);
   const { toast } = useToast();
@@ -129,34 +130,55 @@ const Recommendation = () => {
     }
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: "Please select an image smaller than 5MB",
-          variant: "destructive",
-        });
-        return;
-      }
+    if (!file) return;
 
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-      if (!allowedTypes.includes(file.type)) {
-        toast({
-          title: "Invalid file type",
-          description: "Please select a JPEG or PNG image",
-          variant: "destructive",
-        });
-        return;
-      }
+    // Basic client-side checks
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
 
-      setCropImage(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select a JPEG or PNG image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Set preview immediately so user gets instant feedback
+    setCropImage(file);
+    setImageValid(null); // pending validation
+    setCropAnalysis(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Perform immediate client-side validation/analysis. If it fails, clear the image and show error.
+    try {
+      toast({ title: 'Validating image...', description: 'Checking that uploaded image contains crop/leaf' });
+      const result = await analyzeCropImage(file);
+      // If analyzeCropImage resolves, it's treated as valid
+      setCropAnalysis(result);
+      setImageValid(true);
+      toast({ title: 'Image validated', description: `Crop health: ${result.cropHealth}` });
+    } catch (err: any) {
+      console.error('Image validation failed on upload:', err);
+      setCropImage(null);
+      setImagePreview(null);
+      setImageValid(false);
+      setCropAnalysis(null);
+      toast({ title: 'Invalid image', description: err?.message || 'Please upload a clear image of crops or leaves', variant: 'destructive' });
     }
   };
 
@@ -193,26 +215,37 @@ const Recommendation = () => {
       }
       setWeatherData(weather);
 
-      // Step 2: Analyze crop image if provided
-      let cropAnalysisResult: CropAnalysisResult | undefined;
+      // Step 2: Use cropAnalysis computed during upload if present
+      let cropAnalysisResult: CropAnalysisResult | undefined = undefined;
       if (cropImage) {
-        setAnalysisProgress(40);
-        toast({
-          title: "Analyzing crop image...",
-          description: "AI is analyzing your crop for nutrient deficiencies",
-        });
+        // If imageValid is explicitly false, stop early
+        if (imageValid === false) {
+          throw new Error('Uploaded image failed validation. Please upload a clear crop image.');
+        }
 
-        try {
-          cropAnalysisResult = await analyzeCropImage(cropImage);
-          setCropAnalysis(cropAnalysisResult);
+        // If cropAnalysis was already computed during upload, reuse it. Otherwise analyze now.
+        if (cropAnalysis) {
+          cropAnalysisResult = cropAnalysis;
+        } else {
+          setAnalysisProgress(40);
           toast({
-            title: "Crop analysis complete",
-            description: `Crop health assessed as ${cropAnalysisResult.cropHealth}`,
+            title: "Analyzing crop image...",
+            description: "AI is analyzing your crop for nutrient deficiencies",
           });
-        } catch (analysisError: any) {
-          console.error('Crop analysis failed:', analysisError);
-          // Stop the entire process if image validation fails
-          throw new Error(analysisError?.message || "Please upload a valid crop image with visible plants or vegetation");
+
+          try {
+            cropAnalysisResult = await analyzeCropImage(cropImage);
+            setCropAnalysis(cropAnalysisResult);
+            setImageValid(true);
+            toast({
+              title: "Crop analysis complete",
+              description: `Crop health assessed as ${cropAnalysisResult.cropHealth}`,
+            });
+          } catch (analysisError: any) {
+            console.error('Crop analysis failed:', analysisError);
+            setImageValid(false);
+            throw new Error(analysisError?.message || "Please upload a valid crop image with visible plants or vegetation");
+          }
         }
       }
 
@@ -462,9 +495,17 @@ const Recommendation = () => {
                           alt="Crop preview" 
                           className="w-full h-32 object-cover rounded-lg border border-border"
                         />
-                        <div className="flex items-center mt-2 text-sm text-muted-foreground">
+                        <div className="flex items-center mt-2 text-sm">
                           <Brain className="h-4 w-4 mr-2 text-primary" />
-                          Ready for AI analysis
+                          {imageValid === null && (
+                            <span className="text-muted-foreground">Validating image...</span>
+                          )}
+                          {imageValid === true && (
+                            <span className="text-green-600">Image validated for crop analysis</span>
+                          )}
+                          {imageValid === false && (
+                            <span className="text-destructive">Invalid image — please upload a crop or leaf photo</span>
+                          )}
                         </div>
                       </div>
                     )}
@@ -689,7 +730,7 @@ const Recommendation = () => {
                   <Button 
                     type="submit" 
                     size="lg" 
-                    disabled={isLoading}
+                    disabled={isLoading || (cropImage ? imageValid !== true : false)}
                     className="bg-gradient-primary text-primary-foreground shadow-glow hover:shadow-strong transition-all duration-300 hover:scale-105"
                   >
                     {isLoading ? (
