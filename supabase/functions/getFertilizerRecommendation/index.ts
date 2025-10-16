@@ -185,7 +185,7 @@ serve(async (req) => {
           deficiency: visionResult.deficiency,
           detectedLabels: visionResult.labels?.slice(0, 5)
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error('Vision API error:', err);
         return new Response(
           JSON.stringify({ error: `Image analysis failed: ${err.message}` }), 
@@ -467,7 +467,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error in getFertilizerRecommendation:", err);
     return new Response(
       JSON.stringify({ error: err.message || "Internal server error" }),
@@ -484,8 +484,9 @@ serve(async (req) => {
  */
 async function callVisionApi(base64body: string) {
   if (!VISION_KEY) {
-    console.warn("GOOGLE_VISION_API_KEY not set - skipping Vision API validation");
-    return { isPlant: false };
+    console.warn("GOOGLE_VISION_API_KEY not set - skipping Vision API validation. Returning permissive default to allow local/dev flows.");
+    // Return permissive default so the recommendation flow can proceed when no Vision key is configured.
+    return { labels: ['unknown'], isPlant: true, avgGreen: 140, deficiency: 'Healthy (vision API skipped)' };
   }
 
   const body = {

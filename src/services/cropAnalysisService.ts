@@ -73,13 +73,31 @@ const analyzeLeafColor = (data: Uint8ClampedArray): ColorAnalysis => {
 
 export const analyzeCropImage = async (imageFile: File): Promise<CropAnalysisResult> => {
   console.log('Starting AI-powered crop image analysis for:', imageFile.name);
-  
-  return new Promise((resolve) => {
+
+  return new Promise((resolve, reject) => {
+    // Immediate file validation
+    if (!imageFile) {
+      reject(new Error('No image file provided'));
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (imageFile.size > 5 * 1024 * 1024) {
+      reject(new Error('Image file is too large. Please upload an image smaller than 5MB.'));
+      return;
+    }
+
+    // Validate file type
+    if (!['image/jpeg', 'image/png', 'image/jpg'].includes(imageFile.type)) {
+      reject(new Error('Invalid file type. Please upload a JPEG or PNG image.'));
+      return;
+    }
+
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       const img = new Image();
-      
+
       img.onload = () => {
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
@@ -88,43 +106,128 @@ export const analyzeCropImage = async (imageFile: File): Promise<CropAnalysisRes
         
         if (!ctx) {
           console.error('Failed to get canvas context');
-          throw new Error('Unable to analyze image - canvas error');
+          reject(new Error('Unable to analyze image - canvas error'));
+          return;
         }
-        
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        try {
+          ctx.drawImage(img, 0, 0);
+        } catch (error) {
+          console.error('Failed to draw image to canvas:', error);
+          reject(new Error('Unable to analyze image - drawing error'));
+          return;
+        }
+        let imageData: ImageData;
+        try {
+          imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        } catch (error) {
+          console.error('Failed to get image data:', error);
+          reject(new Error('Unable to analyze image - reading error'));
+          return;
+        }
         const data = imageData.data;
-        
-        let greenPixels = 0;
-        let strongGreenPixels = 0;
         const totalPixels = data.length / 4;
         const colorGroups = new Set<string>();
         
-        // First pass: basic validation
+        // Enhanced validation logic with multiple checks
+        let greenPixels = 0;
+        let strongGreenPixels = 0;
+        let bluePixels = 0;
+        let uniformityCount = 0;
+        let lastColor = '';
+        let textureVariation = 0;
+        let edgeCount = 0;
+        
+        // First pass: color analysis
         for (let i = 0; i < data.length; i += 4) {
           const r = data[i];
           const g = data[i + 1];
           const b = data[i + 2];
           
-          colorGroups.add(`${Math.floor(r/50)}-${Math.floor(g/50)}-${Math.floor(b/50)}`);
+          const colorGroup = `${Math.floor(r/30)}-${Math.floor(g/30)}-${Math.floor(b/30)}`;
+          colorGroups.add(colorGroup);
           
-          if (g > r && g > b && g > 50) {
-            greenPixels++;
-            if (g > 100 && g > r * 1.2 && g > b * 1.2) {
-              strongGreenPixels++;
+          // Check for natural green colors (plant-like)
+          if (g > r && g > b) {
+            if (g > 50) {
+              greenPixels++;
+              // Strong green with natural variation
+              if (g > 100 && g > r * 1.3 && g > b * 1.3 && r > 30) {
+                strongGreenPixels++;
+              }
+            }
+          }
+          
+          // Detect unnatural blue (sky/water)
+          if (b > r * 1.5 && b > g * 1.2) {
+            bluePixels++;
+          }
+          
+          // Check color uniformity (detect artificial images)
+          if (colorGroup === lastColor) {
+            uniformityCount++;
+          }
+          lastColor = colorGroup;
+          
+          // Basic edge detection for texture
+          if (i > 4 && i < data.length - 4) {
+            const prevG = data[i-3];
+            const nextG = data[i+5];
+            if (Math.abs(g - prevG) > 20 || Math.abs(g - nextG) > 20) {
+              edgeCount++;
+              textureVariation += Math.abs(g - prevG);
             }
           }
         }
         
         const greenPercentage = (greenPixels / totalPixels) * 100;
         const strongGreenPercentage = (strongGreenPixels / totalPixels) * 100;
+        const bluePercentage = (bluePixels / totalPixels) * 100;
+        const uniformityPercentage = (uniformityCount / totalPixels) * 100;
+        const textureScore = textureVariation / totalPixels;
+        const edgePercentage = (edgeCount / totalPixels) * 100;
         
-        console.log(`Validation: ${greenPercentage.toFixed(2)}% green, ${strongGreenPercentage.toFixed(2)}% strong, ${colorGroups.size} colors`);
+        console.log('Image analysis:', {
+          greenPercentage: greenPercentage.toFixed(1) + '%',
+          strongGreenPercentage: strongGreenPercentage.toFixed(1) + '%',
+          bluePercentage: bluePercentage.toFixed(1) + '%',
+          colorGroups: colorGroups.size,
+          uniformityPercentage: uniformityPercentage.toFixed(1) + '%',
+          textureScore: textureScore.toFixed(1),
+          edgePercentage: edgePercentage.toFixed(1) + '%'
+        });
         
-        // Strict validation
-        if (greenPercentage < 30 || strongGreenPercentage < 15 || colorGroups.size < 50) {
-          console.error('Image validation failed');
-          throw new Error('Please upload a clear image of crops or plants. The uploaded image does not appear to contain adequate vegetation.');
+        // Strict multi-factor validation
+        const validationErrors = [];
+        
+        if (greenPercentage < 25) {
+          validationErrors.push('insufficient green content');
+        }
+        if (strongGreenPercentage < 10) {
+          validationErrors.push('lack of healthy plant coloration');
+        }
+        if (bluePercentage > 40) {
+          validationErrors.push('too much sky/water content');
+        }
+        if (uniformityPercentage > 80) {
+          validationErrors.push('suspiciously uniform coloring');
+        }
+        if (colorGroups.size < 100) {
+          validationErrors.push('not enough color variation');
+        }
+        if (textureScore < 5) {
+          validationErrors.push('insufficient leaf/plant texture');
+        }
+        if (edgePercentage < 10) {
+          validationErrors.push('missing natural plant edges/details');
+        }
+        
+        if (validationErrors.length > 0) {
+          console.error('Image validation failed:', validationErrors);
+          reject(new Error(
+            `Please upload a clear image of crops or plants. Issues detected: ${validationErrors.join(', ')}.`
+          ));
+          return;
         }
         
         // Perform color analysis for nutrient deficiency detection
@@ -228,14 +331,14 @@ export const analyzeCropImage = async (imageFile: File): Promise<CropAnalysisRes
       };
       
       img.onerror = () => {
-        throw new Error('Failed to load image file');
+        reject(new Error('Failed to load image file'));
       };
       
       img.src = e.target?.result as string;
     };
     
     reader.onerror = () => {
-      throw new Error('Failed to read image file');
+      reject(new Error('Failed to read image file'));
     };
     
     reader.readAsDataURL(imageFile);
