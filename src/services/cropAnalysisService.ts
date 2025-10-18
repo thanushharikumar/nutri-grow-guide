@@ -1,4 +1,24 @@
 import { supabase } from "@/integrations/supabase/client";
+const validateCropWithVision = async (base64Image: string) => {
+  const response = await fetch(
+    "https://bkqzrfuyjugegxcqxwuo.supabase.co/functions/v1/validate-crop-image",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: base64Image.split(",")[1] }), // remove data:image/... prefix
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || "Image validation failed by Vision API");
+  }
+
+  const data = await response.json();
+  console.log("Vision API Validation Success:", data);
+  return data;
+};
+
 
 // Mock CNN analysis service for crop nutrient deficiency detection
 export interface NutrientDeficiency {
@@ -93,41 +113,33 @@ export const analyzeCropImage = async (imageFile: File): Promise<CropAnalysisRes
       return;
     }
 
-    const reader = new FileReader();
+    reader.onload = async (e) => {
+  try {
+    const base64Image = e.target?.result as string;
 
-    reader.onload = (e) => {
-      const img = new Image();
+    // ✅ Step 1: Validate Crop Image Using Google Vision API via Supabase Edge Function
+    await validateCropWithVision(base64Image);
+    console.log('✅ Vision API confirmed this is a crop/plant image');
 
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        
-        if (!ctx) {
-          console.error('Failed to get canvas context');
-          reject(new Error('Unable to analyze image - canvas error'));
-          return;
-        }
+    // ✅ Step 2: Continue with your existing pixel analysis
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
 
-        try {
-          ctx.drawImage(img, 0, 0);
-        } catch (error) {
-          console.error('Failed to draw image to canvas:', error);
-          reject(new Error('Unable to analyze image - drawing error'));
-          return;
-        }
-        let imageData: ImageData;
-        try {
-          imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        } catch (error) {
-          console.error('Failed to get image data:', error);
-          reject(new Error('Unable to analyze image - reading error'));
-          return;
-        }
-        const data = imageData.data;
-        const totalPixels = data.length / 4;
-        const colorGroups = new Set<string>();
+      if (!ctx) {
+        reject(new Error('Unable to analyze image - canvas error'));
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+     
+
         
         // Enhanced validation logic with multiple checks
         let greenPixels = 0;
