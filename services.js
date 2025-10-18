@@ -126,3 +126,45 @@ export class FertilizerService {
     }
   }
 }
+
+// Function to validate crop image before sending to recommendation
+export async function validateCropImage(file) {
+  // Convert image file to Base64
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  try {
+    const base64Image = await fileToBase64(file);
+
+    // 🔗 Call Supabase Edge Function
+    const response = await fetch(
+      "https://bkqzrfuyjugegxcqxwuo.supabase.co/functions/v1/validate-crop-image",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image: base64Image }),
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.valid) {
+      throw new Error(result.message || "Invalid crop image");
+    }
+
+    console.log("✅ Crop image validated:", result.labels);
+    return result;
+  } catch (error) {
+    console.error("❌ Crop validation failed:", error.message);
+    alert(error.message || "Failed to validate crop image");
+    return { valid: false };
+  }
+}
