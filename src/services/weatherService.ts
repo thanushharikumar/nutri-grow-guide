@@ -53,15 +53,24 @@ export const getUserLocation = (): Promise<Coordinates> => {
       return;
     }
 
+    console.log('Requesting user location...');
+    
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        console.log('Location granted:', position.coords.latitude, position.coords.longitude);
         resolve({
           lat: position.coords.latitude,
           lon: position.coords.longitude,
         });
       },
       (error) => {
+        console.error('Geolocation error:', error.code, error.message);
         reject(error);
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 300000 // 5 minutes cache
       }
     );
   });

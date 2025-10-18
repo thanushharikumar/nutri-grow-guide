@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.getFertilizerRecommendation]
 verify_jwt = false
+
+[functions.validate-crop-image]
+verify_jwt = false
