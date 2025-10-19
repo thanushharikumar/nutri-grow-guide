@@ -61,16 +61,13 @@ const Recommendation = () => {
   const fetchSoilData = async () => {
     setIsLoadingSoilData(true);
     try {
-      toast({
-        title: "Location access needed",
-        description: "Please allow location access in your browser to fetch soil data",
-      });
-
       let coordinates: { lat: number; lon: number };
       
       try {
-        // This will trigger browser's location permission prompt
+        // This will trigger browser's location permission prompt immediately
+        console.log('🔍 Requesting location permission...');
         coordinates = await getUserLocation();
+        console.log('✅ Location permission granted:', coordinates);
       } catch (locationError) {
         console.error('Geolocation error:', locationError);
         
