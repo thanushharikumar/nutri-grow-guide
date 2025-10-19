@@ -2,8 +2,12 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://bkqzrfuyjugegxcqxwuo.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrcXpyZnV5anVnZWd4Y3F4d3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyNDUyNDgsImV4cCI6MjA3MzgyMTI0OH0.Nj4n7IvvZutma2w-0leJa78n9l03rngzuxt9MQS5N5A";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://bkqzrfuyjugegxcqxwuo.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrcXpyZnV5anVnZWd4Y3F4d3VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyNDUyNDgsImV4cCI6MjA3MzgyMTI0OH0.Nj4n7IvvZutma2w-0leJa78n9l03rngzuxt9MQS5N5A";
+
+// For local development, if VITE_USE_LOCAL_FUNCTIONS is true, use local Edge Functions
+const useLocalFunctions = import.meta.env.VITE_USE_LOCAL_FUNCTIONS === 'true';
+const functionURLBase = useLocalFunctions ? 'http://localhost:54321/functions/v1' : `${SUPABASE_URL}/functions/v1`;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
