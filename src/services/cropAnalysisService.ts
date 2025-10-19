@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+
 const validateCropWithVision = async (base64Image: string) => {
   const response = await fetch(
     "https://bkqzrfuyjugegxcqxwuo.supabase.co/functions/v1/validate-crop-image",
@@ -113,242 +114,248 @@ export const analyzeCropImage = async (imageFile: File): Promise<CropAnalysisRes
       return;
     }
 
+    const reader = new FileReader();
+    
     reader.onload = async (e) => {
-  try {
-    const base64Image = e.target?.result as string;
+      try {
+        const base64Image = e.target?.result as string;
 
-    // ✅ Step 1: Validate Crop Image Using Google Vision API via Supabase Edge Function
-    await validateCropWithVision(base64Image);
-    console.log('✅ Vision API confirmed this is a crop/plant image');
+        // ✅ Step 1: Validate Crop Image Using Google Vision API via Supabase Edge Function
+        await validateCropWithVision(base64Image);
+        console.log('✅ Vision API confirmed this is a crop/plant image');
 
-    // ✅ Step 2: Continue with your existing pixel analysis
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
+        // ✅ Step 2: Continue with your existing pixel analysis
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
 
-      if (!ctx) {
-        reject(new Error('Unable to analyze image - canvas error'));
-        return;
-      }
+          if (!ctx) {
+            reject(new Error('Unable to analyze image - canvas error'));
+            return;
+          }
 
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
 
-     
-
-        
-        // Enhanced validation logic with multiple checks
-        let greenPixels = 0;
-        let strongGreenPixels = 0;
-        let bluePixels = 0;
-        let uniformityCount = 0;
-        let lastColor = '';
-        let textureVariation = 0;
-        let edgeCount = 0;
-        
-        // First pass: color analysis
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
+          const totalPixels = data.length / 4;
+          const colorGroups = new Set<string>();
           
-          const colorGroup = `${Math.floor(r/30)}-${Math.floor(g/30)}-${Math.floor(b/30)}`;
-          colorGroups.add(colorGroup);
+          // Enhanced validation logic with multiple checks
+          let greenPixels = 0;
+          let strongGreenPixels = 0;
+          let bluePixels = 0;
+          let uniformityCount = 0;
+          let lastColor = '';
+          let textureVariation = 0;
+          let edgeCount = 0;
           
-          // Check for natural green colors (plant-like)
-          if (g > r && g > b) {
-            if (g > 50) {
-              greenPixels++;
-              // Strong green with natural variation
-              if (g > 100 && g > r * 1.3 && g > b * 1.3 && r > 30) {
-                strongGreenPixels++;
+          // First pass: color analysis
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            
+            const colorGroup = `${Math.floor(r/30)}-${Math.floor(g/30)}-${Math.floor(b/30)}`;
+            colorGroups.add(colorGroup);
+            
+            // Check for natural green colors (plant-like)
+            if (g > r && g > b) {
+              if (g > 50) {
+                greenPixels++;
+                // Strong green with natural variation
+                if (g > 100 && g > r * 1.3 && g > b * 1.3 && r > 30) {
+                  strongGreenPixels++;
+                }
+              }
+            }
+            
+            // Detect unnatural blue (sky/water)
+            if (b > r * 1.5 && b > g * 1.2) {
+              bluePixels++;
+            }
+            
+            // Check color uniformity (detect artificial images)
+            if (colorGroup === lastColor) {
+              uniformityCount++;
+            }
+            lastColor = colorGroup;
+            
+            // Basic edge detection for texture
+            if (i > 4 && i < data.length - 4) {
+              const prevG = data[i-3];
+              const nextG = data[i+5];
+              if (Math.abs(g - prevG) > 20 || Math.abs(g - nextG) > 20) {
+                edgeCount++;
+                textureVariation += Math.abs(g - prevG);
               }
             }
           }
           
-          // Detect unnatural blue (sky/water)
-          if (b > r * 1.5 && b > g * 1.2) {
-            bluePixels++;
+          const greenPercentage = (greenPixels / totalPixels) * 100;
+          const strongGreenPercentage = (strongGreenPixels / totalPixels) * 100;
+          const bluePercentage = (bluePixels / totalPixels) * 100;
+          const uniformityPercentage = (uniformityCount / totalPixels) * 100;
+          const textureScore = textureVariation / totalPixels;
+          const edgePercentage = (edgeCount / totalPixels) * 100;
+          
+          console.log('Image analysis:', {
+            greenPercentage: greenPercentage.toFixed(1) + '%',
+            strongGreenPercentage: strongGreenPercentage.toFixed(1) + '%',
+            bluePercentage: bluePercentage.toFixed(1) + '%',
+            colorGroups: colorGroups.size,
+            uniformityPercentage: uniformityPercentage.toFixed(1) + '%',
+            textureScore: textureScore.toFixed(1),
+            edgePercentage: edgePercentage.toFixed(1) + '%'
+          });
+          
+          // Strict multi-factor validation
+          const validationErrors = [];
+          
+          if (greenPercentage < 25) {
+            validationErrors.push('insufficient green content');
+          }
+          if (strongGreenPercentage < 10) {
+            validationErrors.push('lack of healthy plant coloration');
+          }
+          if (bluePercentage > 40) {
+            validationErrors.push('too much sky/water content');
+          }
+          if (uniformityPercentage > 80) {
+            validationErrors.push('suspiciously uniform coloring');
+          }
+          if (colorGroups.size < 100) {
+            validationErrors.push('not enough color variation');
+          }
+          if (textureScore < 5) {
+            validationErrors.push('insufficient leaf/plant texture');
+          }
+          if (edgePercentage < 10) {
+            validationErrors.push('missing natural plant edges/details');
           }
           
-          // Check color uniformity (detect artificial images)
-          if (colorGroup === lastColor) {
-            uniformityCount++;
+          if (validationErrors.length > 0) {
+            console.error('Image validation failed:', validationErrors);
+            reject(new Error(
+              `Please upload a clear image of crops or plants. Issues detected: ${validationErrors.join(', ')}.`
+            ));
+            return;
           }
-          lastColor = colorGroup;
           
-          // Basic edge detection for texture
-          if (i > 4 && i < data.length - 4) {
-            const prevG = data[i-3];
-            const nextG = data[i+5];
-            if (Math.abs(g - prevG) > 20 || Math.abs(g - nextG) > 20) {
-              edgeCount++;
-              textureVariation += Math.abs(g - prevG);
+          // Perform color analysis for nutrient deficiency detection
+          const colorAnalysis = analyzeLeafColor(data);
+          console.log('Color analysis:', colorAnalysis);
+          
+          // Detect deficiencies based on color patterns
+          const deficiencies: NutrientDeficiency[] = [];
+          
+          // Nitrogen deficiency (yellowish leaves)
+          if (colorAnalysis.yellowishPixels > 10 || 
+              (colorAnalysis.avgGreen < 80 && colorAnalysis.avgRed > 100)) {
+            deficiencies.push({
+              nutrient: 'nitrogen',
+              severity: colorAnalysis.yellowishPixels > 20 ? 'high' : colorAnalysis.yellowishPixels > 15 ? 'moderate' : 'low',
+              confidence: 0.75 + (colorAnalysis.yellowishPixels / 100),
+              symptoms: ['Yellowing of lower leaves', 'Stunted growth', 'Pale leaf color']
+            });
+          }
+          
+          // Phosphorus deficiency (dark/purple tint)
+          if (colorAnalysis.darkPixels > 8 || colorAnalysis.avgBlue > 120) {
+            deficiencies.push({
+              nutrient: 'phosphorus',
+              severity: colorAnalysis.darkPixels > 15 ? 'high' : colorAnalysis.darkPixels > 10 ? 'moderate' : 'low',
+              confidence: 0.70 + (colorAnalysis.darkPixels / 100),
+              symptoms: ['Purple/reddish leaf coloration', 'Delayed maturity', 'Dark green/blue-ish leaves']
+            });
+          }
+          
+          // Potassium deficiency (pale/washed out)
+          if (colorAnalysis.palePixels > 12 || 
+              (strongGreenPercentage < 20 && greenPercentage > 30)) {
+            deficiencies.push({
+              nutrient: 'potassium',
+              severity: colorAnalysis.palePixels > 20 ? 'high' : colorAnalysis.palePixels > 15 ? 'moderate' : 'low',
+              confidence: 0.72 + (colorAnalysis.palePixels / 100),
+              symptoms: ['Brown leaf edges', 'Weak stems', 'Pale, washed-out appearance']
+            });
+          }
+          
+          // Determine overall health
+          let cropHealth: 'excellent' | 'good' | 'fair' | 'poor' = 'good';
+          if (deficiencies.length === 0 && greenPercentage > 60 && strongGreenPercentage > 30) {
+            cropHealth = 'excellent';
+          } else if (deficiencies.length >= 2 || deficiencies.some(d => d.severity === 'high')) {
+            cropHealth = 'poor';
+          } else if (deficiencies.length === 1) {
+            cropHealth = 'fair';
+          }
+          
+          // Generate recommendations
+          const recommendations: string[] = [];
+          if (deficiencies.length === 0) {
+            recommendations.push('Crop appears healthy. Continue current fertilization practices.');
+            recommendations.push('Monitor crop regularly for any changes.');
+          } else {
+            deficiencies.forEach(def => {
+              switch(def.nutrient) {
+                case 'nitrogen':
+                  recommendations.push('Add Urea (46-0-0) or Ammonium Sulfate (21-0-0) - Apply 20-30 kg/ha');
+                  break;
+                case 'phosphorus':
+                  recommendations.push('Apply DAP (18-46-0) or Single Super Phosphate - Apply 15-25 kg/ha P₂O₅');
+                  break;
+                case 'potassium':
+                  recommendations.push('Add MOP (Muriate of Potash) or Sulphate of Potash - Apply 10-20 kg/ha K₂O');
+                  break;
+              }
+            });
+            
+            if (cropHealth === 'poor') {
+              recommendations.push('⚠️ Soil testing strongly recommended');
+              recommendations.push('Consider foliar spray for quick nutrient uptake');
             }
           }
-        }
-        
-        const greenPercentage = (greenPixels / totalPixels) * 100;
-        const strongGreenPercentage = (strongGreenPixels / totalPixels) * 100;
-        const bluePercentage = (bluePixels / totalPixels) * 100;
-        const uniformityPercentage = (uniformityCount / totalPixels) * 100;
-        const textureScore = textureVariation / totalPixels;
-        const edgePercentage = (edgeCount / totalPixels) * 100;
-        
-        console.log('Image analysis:', {
-          greenPercentage: greenPercentage.toFixed(1) + '%',
-          strongGreenPercentage: strongGreenPercentage.toFixed(1) + '%',
-          bluePercentage: bluePercentage.toFixed(1) + '%',
-          colorGroups: colorGroups.size,
-          uniformityPercentage: uniformityPercentage.toFixed(1) + '%',
-          textureScore: textureScore.toFixed(1),
-          edgePercentage: edgePercentage.toFixed(1) + '%'
-        });
-        
-        // Strict multi-factor validation
-        const validationErrors = [];
-        
-        if (greenPercentage < 25) {
-          validationErrors.push('insufficient green content');
-        }
-        if (strongGreenPercentage < 10) {
-          validationErrors.push('lack of healthy plant coloration');
-        }
-        if (bluePercentage > 40) {
-          validationErrors.push('too much sky/water content');
-        }
-        if (uniformityPercentage > 80) {
-          validationErrors.push('suspiciously uniform coloring');
-        }
-        if (colorGroups.size < 100) {
-          validationErrors.push('not enough color variation');
-        }
-        if (textureScore < 5) {
-          validationErrors.push('insufficient leaf/plant texture');
-        }
-        if (edgePercentage < 10) {
-          validationErrors.push('missing natural plant edges/details');
-        }
-        
-        if (validationErrors.length > 0) {
-          console.error('Image validation failed:', validationErrors);
-          reject(new Error(
-            `Please upload a clear image of crops or plants. Issues detected: ${validationErrors.join(', ')}.`
-          ));
-          return;
-        }
-        
-        // Perform color analysis for nutrient deficiency detection
-        const colorAnalysis = analyzeLeafColor(data);
-        console.log('Color analysis:', colorAnalysis);
-        
-        // Detect deficiencies based on color patterns
-        const deficiencies: NutrientDeficiency[] = [];
-        
-        // Nitrogen deficiency (yellowish leaves)
-        if (colorAnalysis.yellowishPixels > 10 || 
-            (colorAnalysis.avgGreen < 80 && colorAnalysis.avgRed > 100)) {
-          deficiencies.push({
-            nutrient: 'nitrogen',
-            severity: colorAnalysis.yellowishPixels > 20 ? 'high' : colorAnalysis.yellowishPixels > 15 ? 'moderate' : 'low',
-            confidence: 0.75 + (colorAnalysis.yellowishPixels / 100),
-            symptoms: ['Yellowing of lower leaves', 'Stunted growth', 'Pale leaf color']
-          });
-        }
-        
-        // Phosphorus deficiency (dark/purple tint)
-        if (colorAnalysis.darkPixels > 8 || colorAnalysis.avgBlue > 120) {
-          deficiencies.push({
-            nutrient: 'phosphorus',
-            severity: colorAnalysis.darkPixels > 15 ? 'high' : colorAnalysis.darkPixels > 10 ? 'moderate' : 'low',
-            confidence: 0.70 + (colorAnalysis.darkPixels / 100),
-            symptoms: ['Purple/reddish leaf coloration', 'Delayed maturity', 'Dark green/blue-ish leaves']
-          });
-        }
-        
-        // Potassium deficiency (pale/washed out)
-        if (colorAnalysis.palePixels > 12 || 
-            (strongGreenPercentage < 20 && greenPercentage > 30)) {
-          deficiencies.push({
-            nutrient: 'potassium',
-            severity: colorAnalysis.palePixels > 20 ? 'high' : colorAnalysis.palePixels > 15 ? 'moderate' : 'low',
-            confidence: 0.72 + (colorAnalysis.palePixels / 100),
-            symptoms: ['Brown leaf edges', 'Weak stems', 'Pale, washed-out appearance']
-          });
-        }
-        
-        // Determine overall health
-        let cropHealth: 'excellent' | 'good' | 'fair' | 'poor' = 'good';
-        if (deficiencies.length === 0 && greenPercentage > 60 && strongGreenPercentage > 30) {
-          cropHealth = 'excellent';
-        } else if (deficiencies.length >= 2 || deficiencies.some(d => d.severity === 'high')) {
-          cropHealth = 'poor';
-        } else if (deficiencies.length === 1) {
-          cropHealth = 'fair';
-        }
-        
-        // Generate recommendations
-        const recommendations: string[] = [];
-        if (deficiencies.length === 0) {
-          recommendations.push('Crop appears healthy. Continue current fertilization practices.');
-          recommendations.push('Monitor crop regularly for any changes.');
-        } else {
-          deficiencies.forEach(def => {
-            switch(def.nutrient) {
-              case 'nitrogen':
-                recommendations.push('Add Urea (46-0-0) or Ammonium Sulfate (21-0-0) - Apply 20-30 kg/ha');
-                break;
-              case 'phosphorus':
-                recommendations.push('Apply DAP (18-46-0) or Single Super Phosphate - Apply 15-25 kg/ha P₂O₅');
-                break;
-              case 'potassium':
-                recommendations.push('Add MOP (Muriate of Potash) or Sulphate of Potash - Apply 10-20 kg/ha K₂O');
-                break;
-            }
-          });
           
-          if (cropHealth === 'poor') {
-            recommendations.push('⚠️ Soil testing strongly recommended');
-            recommendations.push('Consider foliar spray for quick nutrient uptake');
-          }
-        }
-        
-        const result: CropAnalysisResult = {
-          cropHealth,
-          deficiencies,
-          recommendations,
-          confidence: 0.80 + (greenPercentage / 500) // 0.80-0.92 range
+          const result: CropAnalysisResult = {
+            cropHealth,
+            deficiencies,
+            recommendations,
+            confidence: 0.80 + (greenPercentage / 500) // 0.80-0.92 range
+          };
+          
+          // Store in database
+          supabase
+            .from('crop_analysis')
+            .insert({
+              crop_health: result.cropHealth,
+              deficiencies: JSON.parse(JSON.stringify(result.deficiencies)),
+              recommendations: result.recommendations,
+              confidence: result.confidence
+            })
+            .select()
+            .single()
+            .then(({ error }) => {
+              if (error) console.error('DB storage error:', error);
+            });
+          
+          resolve(result);
         };
         
-        // Store in database
-        supabase
-          .from('crop_analysis')
-          .insert({
-            crop_health: result.cropHealth,
-            deficiencies: JSON.parse(JSON.stringify(result.deficiencies)),
-            recommendations: result.recommendations,
-            confidence: result.confidence
-          })
-          .select()
-          .single()
-          .then(({ error }) => {
-            if (error) console.error('DB storage error:', error);
-          });
+        img.onerror = () => {
+          reject(new Error('Failed to load image file'));
+        };
         
-        resolve(result);
-      };
-      
-      img.onerror = () => {
-        reject(new Error('Failed to load image file'));
-      };
-      
-      img.src = e.target?.result as string;
+        img.src = e.target?.result as string;
+      } catch (error) {
+        console.error('Error during crop analysis:', error);
+        reject(error instanceof Error ? error : new Error('Failed to analyze crop image'));
+      }
     };
-    
+      
     reader.onerror = () => {
       reject(new Error('Failed to read image file'));
     };

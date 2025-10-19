@@ -49,28 +49,36 @@ export const getWeatherData = async (coordinates?: Coordinates): Promise<Weather
 export const getUserLocation = (): Promise<Coordinates> => {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
+      console.error('❌ Geolocation is not supported by this browser');
       reject(new Error('Geolocation is not supported by this browser'));
       return;
     }
 
-    console.log('Requesting user location...');
+    console.log('🌍 Requesting browser location permission...');
     
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        console.log('Location granted:', position.coords.latitude, position.coords.longitude);
+        console.log('✅ Location permission granted:', position.coords.latitude, position.coords.longitude);
         resolve({
           lat: position.coords.latitude,
           lon: position.coords.longitude,
         });
       },
       (error) => {
-        console.error('Geolocation error:', error.code, error.message);
+        console.error('❌ Geolocation error:', error.code, error.message);
+        if (error.code === 1) {
+          console.error('User denied location permission');
+        } else if (error.code === 2) {
+          console.error('Location position unavailable');
+        } else if (error.code === 3) {
+          console.error('Location request timeout');
+        }
         reject(error);
       },
       {
-        enableHighAccuracy: false,
-        timeout: 10000,
-        maximumAge: 300000 // 5 minutes cache
+        enableHighAccuracy: true, // Request high accuracy to ensure permission prompt
+        timeout: 15000, // Increase timeout
+        maximumAge: 0 // Don't use cached position - always request fresh
       }
     );
   });
