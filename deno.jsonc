@@ -1,0 +1,10 @@
+{
+  "tasks": {
+    "serve": "deno run --allow-net --allow-env --allow-read supabase/functions/*/index.ts"
+  },
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window"],
+    "strict": true
+  }
+}

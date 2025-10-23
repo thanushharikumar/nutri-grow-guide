@@ -22,49 +22,8 @@ export interface SoilHealthData {
   lastUpdated: Date;
 }
 
-// Mock soil health database for different regions
-const mockSoilHealthDatabase: Record<string, Omit<SoilHealthData, 'location' | 'lastUpdated'>> = {
-  'North India': {
-    soilType: 'loamy',
-    pH: 7.2,
-    nitrogen: 280,
-    phosphorus: 45,
-    potassium: 180,
-    organicCarbon: 1.8,
-    electricalConductivity: 0.3,
-    micronutrients: { iron: 15, manganese: 8, zinc: 1.5, copper: 0.8 }
-  },
-  'West India': {
-    soilType: 'clayey',
-    pH: 6.8,
-    nitrogen: 320,
-    phosphorus: 38,
-    potassium: 160,
-    organicCarbon: 1.2,
-    electricalConductivity: 0.4,
-    micronutrients: { iron: 12, manganese: 6, zinc: 1.2, copper: 0.6 }
-  },
-  'South India': {
-    soilType: 'sandy',
-    pH: 6.5,
-    nitrogen: 180,
-    phosphorus: 28,
-    potassium: 120,
-    organicCarbon: 0.8,
-    electricalConductivity: 0.2,
-    micronutrients: { iron: 18, manganese: 10, zinc: 1.8, copper: 1.0 }
-  },
-  'East India': {
-    soilType: 'silty',
-    pH: 7.0,
-    nitrogen: 250,
-    phosphorus: 42,
-    potassium: 200,
-    organicCarbon: 1.5,
-    electricalConductivity: 0.2,
-    micronutrients: { iron: 20, manganese: 12, zinc: 2.0, copper: 1.2 }
-  }
-};
+// Import mock data from separate file
+import { mockSoilData } from './mockData';
 
 // Function to determine region based on coordinates
 const getRegionFromCoordinates = (coordinates: Coordinates): string => {
@@ -79,54 +38,29 @@ const getRegionFromCoordinates = (coordinates: Coordinates): string => {
 };
 
 export const getSoilHealthData = async (coordinates: Coordinates): Promise<SoilHealthData> => {
+  console.log('🌍 Starting soil health data fetch...');
+  
+  if (!coordinates || typeof coordinates.lat !== 'number' || typeof coordinates.lon !== 'number') {
+    console.error('❌ Invalid coordinates:', coordinates);
+    throw new Error('Invalid coordinates provided');
+  }
+
   try {
-    // First try to get soil health data from database
-    const { data: soilData, error } = await supabase
-      .from('soil_health')
-      .select('*')
-      .gte('latitude', coordinates.lat - 0.1)
-      .lte('latitude', coordinates.lat + 0.1)
-      .gte('longitude', coordinates.lon - 0.1)
-      .lte('longitude', coordinates.lon + 0.1)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (soilData && !error) {
-      return {
-        soilType: soilData.soil_type as 'sandy' | 'loamy' | 'clayey' | 'silty',
-        nitrogen: Number(soilData.nitrogen),
-        phosphorus: Number(soilData.phosphorus),
-        potassium: Number(soilData.potassium),
-        pH: Number(soilData.ph),
-        organicCarbon: Number(soilData.organic_carbon),
-        electricalConductivity: soilData.electrical_conductivity ? Number(soilData.electrical_conductivity) : undefined,
-        micronutrients: {
-          iron: 15 + Math.random() * 10,
-          manganese: 8 + Math.random() * 5,
-          zinc: 1.5 + Math.random() * 1,
-          copper: 0.8 + Math.random() * 0.4
-        },
-        location: {
-          latitude: coordinates.lat,
-          longitude: coordinates.lon
-        },
-        lastUpdated: new Date(soilData.last_updated)
-      };
-    }
-
-    // If no data found, generate mock data based on region and store it
-    const region = getRegionFromCoordinates(coordinates);
-    const baseData = mockSoilHealthDatabase[region] || mockSoilHealthDatabase['North India'];
+    console.log('🌍 Fetching soil data for coordinates:', coordinates);
     
-    // Add some realistic variations
-    const variationFactor = 0.1;
-    const mockData: SoilHealthData = {
+    // Get region and mock data since Supabase is not running locally
+    const region = getRegionFromCoordinates(coordinates);
+    console.log('📍 Determined region:', region);
+    
+    const baseData = mockSoilData[region]; // Use mockSoilData here
+    if (!baseData) {
+      console.error('❌ No data found for region:', region);
+      throw new Error('No soil data available for this region');
+    }
+    
+    // Return mock data with location and timestamp
+    const soilData: SoilHealthData = {
       ...baseData,
-      nitrogen: Math.round(baseData.nitrogen * (1 + (Math.random() - 0.5) * variationFactor)),
-      phosphorus: Math.round(baseData.phosphorus * (1 + (Math.random() - 0.5) * variationFactor)),
-      potassium: Math.round(baseData.potassium * (1 + (Math.random() - 0.5) * variationFactor)),
-      pH: Math.round((baseData.pH + (Math.random() - 0.5) * 0.4) * 10) / 10,
       location: {
         latitude: coordinates.lat,
         longitude: coordinates.lon
@@ -134,30 +68,11 @@ export const getSoilHealthData = async (coordinates: Coordinates): Promise<SoilH
       lastUpdated: new Date()
     };
 
-    // Store the generated data for future use
-    const { error: insertError } = await supabase
-      .from('soil_health')
-      .insert({
-        latitude: coordinates.lat,
-        longitude: coordinates.lon,
-        soil_type: mockData.soilType,
-        ph: mockData.pH,
-        nitrogen: mockData.nitrogen,
-        phosphorus: mockData.phosphorus,
-        potassium: mockData.potassium,
-        organic_carbon: mockData.organicCarbon,
-        electrical_conductivity: mockData.electricalConductivity,
-        region: region
-      });
-
-    if (insertError) {
-      console.error('Error storing soil health data:', insertError);
-    }
-
-    return mockData;
+    console.log('✅ Retrieved soil health data:', soilData);
+    return soilData;
   } catch (error) {
-    console.error('Error fetching soil health data:', error);
-    throw new Error('Unable to fetch soil health information');
+    console.error('❌ Error getting soil health data:', error);
+    throw error;
   }
 };
 
@@ -189,4 +104,37 @@ export const searchNearbyFarms = async (coordinates: Coordinates, radius: number
   }
   
   return nearbyFarms;
+};
+
+export const uploadSoilHealthCard = async (file: File): Promise<SoilHealthData> => {
+  console.log('📄 Simulating SHC upload and processing for file:', file.name);
+
+  // In a real application, this would involve:
+  // 1. Uploading the file to a storage service (e.g., Supabase Storage)
+  // 2. Calling an AI/ML service (e.g., a Supabase Edge Function) to perform OCR
+  //    and extract soil data from the image.
+  // 3. Validating the extracted data.
+
+  // For now, we'll simulate a delay and return mock data.
+  await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate network delay
+
+  // Return a fixed mock soil data for demonstration purposes
+  const mockUploadedSoilData: SoilHealthData = {
+    soilType: 'loamy',
+    pH: 6.8,
+    nitrogen: 220,
+    phosphorus: 35,
+    potassium: 180,
+    organicCarbon: 1.5,
+    electricalConductivity: 0.5,
+    micronutrients: { iron: 18, manganese: 9, zinc: 1.0, copper: 0.7 },
+    location: {
+      latitude: 28.6139, // Default to New Delhi for mock
+      longitude: 77.2090
+    },
+    lastUpdated: new Date()
+  };
+
+  console.log('✅ Simulated SHC processing complete, returning mock data:', mockUploadedSoilData);
+  return mockUploadedSoilData;
 };

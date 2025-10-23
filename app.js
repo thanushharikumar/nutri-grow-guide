@@ -1,4 +1,5 @@
 // Main Application Logic
+import { WeatherService, SoilHealthService, CropAnalysisService, FertilizerService } from './services.js';
 
 // Global state
 let currentResults = null;
@@ -32,6 +33,32 @@ function navigateToPage(pageName) {
   if (mobileSelect) {
     mobileSelect.value = pageName;
   }
+}
+
+// Geolocation handler
+async function requestUserLocation() {
+  if (!navigator.geolocation) {
+    showToast('Location Error', 'Geolocation is not supported by your browser', 'error');
+    return null;
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coords = {
+          lat: position.coords.latitude,
+          lon: position.coords.longitude
+        };
+        console.log('User location:', coords);
+        resolve(coords);
+      },
+      (error) => {
+        showToast('Location Permission Denied', 'Please enable location to continue', 'error');
+        reject(error);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
 }
 
 // Toast notifications
@@ -97,38 +124,85 @@ async function handleImageUpload(event) {
 // Fetch soil data
 async function fetchSoilData() {
   const btn = document.getElementById('fetch-soil-btn');
-  btn.disabled = true;
-  btn.textContent = 'Fetching...';
+  const loadingIndicator = document.createElement('div');
+  loadingIndicator.className = 'loading-spinner';
   
   try {
-    showToast('Fetching soil data...', 'Getting location and soil health card data');
+    // Disable button and show loading
+    btn.disabled = true;
+    btn.textContent = 'Fetching...';
+    btn.appendChild(loadingIndicator);
     
-    let coordinates;
+    let coordinates = null;
+
+    showToast('Requesting location...', 'Please allow location access in your browser.');
+    console.log('🎯 Starting soil data fetch process...');
+
+    // 🔹 Force location permission request using direct geolocation
     try {
-      coordinates = await WeatherService.getUserLocation();
-    } catch (error) {
-      showToast('Location Permission Required', 'Using default coordinates for demo', 'error');
+      coordinates = await requestUserLocation();
+      console.log("📍 Got user coordinates:", coordinates);
+    } catch (locationError) {
+      console.warn("⚠️ Location access denied, using default:", locationError);
+      showToast('Location permission denied', 'Using default location (New Delhi)', 'error');
       coordinates = { lat: 28.6139, lon: 77.2090 };
     }
-    
-    const soilData = await SoilHealthService.getSoilHealthData(coordinates);
-    
-    // Populate form
-    document.getElementById('soilType').value = soilData.soilType;
-    document.getElementById('pH').value = soilData.pH;
-    document.getElementById('nitrogen').value = soilData.nitrogen;
-    document.getElementById('phosphorus').value = soilData.phosphorus;
-    document.getElementById('potassium').value = soilData.potassium;
-    document.getElementById('organicCarbon').value = soilData.organicCarbon;
-    
+
+    // 🔹 Fetch soil data after getting coordinates
+    console.log('🌱 Requesting soil health data for coordinates:', coordinates);
+    let soilData;
+    try {
+      soilData = await SoilHealthService.getSoilHealthData(coordinates);
+      console.log('📊 Raw soil data response:', soilData);
+      
+      if (!soilData) {
+        throw new Error('No soil data received from service');
+      }
+    } catch (serviceError) {
+      console.error('🚫 Soil health service error:', serviceError);
+      throw new Error(`Soil health service error: ${serviceError.message || 'Unknown error'}`);
+    }
+
+    // Validate and update form fields
+    const fields = {
+      'soilType': soilData.soilType || '',
+      'pH': soilData.pH || '',
+      'nitrogen': soilData.nitrogen || '',
+      'phosphorus': soilData.phosphorus || '',
+      'potassium': soilData.potassium || '',
+      'organicCarbon': soilData.organicCarbon || ''
+    };
+
+    console.log('🔍 Validated soil data fields:', fields);
+
+    // Update all form fields and validate data
+    let hasData = false;
+    for (const [id, value] of Object.entries(fields)) {
+      const element = document.getElementById(id);
+      if (element) {
+        element.value = value;
+        if (value) hasData = true;
+      }
+    }
+
+    if (!hasData) {
+      throw new Error('No valid soil data found for this location');
+    }
+
     showToast('Soil data loaded!', `Found soil health card: ${soilData.cardNumber}`, 'success');
   } catch (error) {
-    showToast('Soil data service error', 'Unable to connect to soil health database', 'error');
+    console.error('Soil data error:', error);
+    showToast(
+      'Soil data service error',
+      error.message || 'Unable to connect to soil health database',
+      'error'
+    );
   } finally {
     btn.disabled = false;
     btn.innerHTML = `
       <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
       </svg>
       Fetch from SHC
     `;
@@ -161,9 +235,10 @@ async function handleFormSubmit(event) {
     
     let coordinates = null;
     try {
-      coordinates = await WeatherService.getUserLocation();
+      coordinates = await requestUserLocation();
     } catch (error) {
       console.log('Using default coordinates');
+      coordinates = { lat: 28.6139, lon: 77.2090 };
     }
     
     // Step 2: Call backend Edge Function
@@ -188,7 +263,8 @@ async function handleFormSubmit(event) {
       imageBase64: cropImageFile ? `${cropImageFile.substring(0, 50)}...` : null 
     });
     
-    const response = await fetch('https://bkqzrfuyjugegxcqxwuo.supabase.co/functions/v1/getFertilizerRecommendation', {
+    // Use relative path so development proxy (Vite) or local functions are used
+    const response = await fetch('/functions/v1/getFertilizerRecommendation', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
