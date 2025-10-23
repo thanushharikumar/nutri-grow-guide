@@ -1,0 +1,9 @@
+{
+  "name": "nutri-grow-guide",
+  "version": "0.0.0",
+  "description": "Simple config file for testing",
+  "features": {
+    "dev": true,
+    "functionsProxy": "/functions"
+  }
+}

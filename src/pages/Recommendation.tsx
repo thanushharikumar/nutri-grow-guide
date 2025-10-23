@@ -59,52 +59,49 @@ const Recommendation = () => {
   });
 
   const fetchSoilData = async () => {
+    console.log('🌍 Fetch soil data triggered');
     setIsLoadingSoilData(true);
+    
     try {
+      // First ask for location permission
+      toast({
+        title: "Location Access",
+        description: "Please allow location access to get accurate soil data for your area.",
+      });
+
       let coordinates: { lat: number; lon: number };
       
       try {
-        // This will trigger browser's location permission prompt immediately
         console.log('🔍 Requesting location permission...');
         coordinates = await getUserLocation();
         console.log('✅ Location permission granted:', coordinates);
-      } catch (locationError) {
-        console.error('Geolocation error:', locationError);
         
-        // Check if it's a permission error
-        if (locationError instanceof GeolocationPositionError) {
-          if (locationError.code === GeolocationPositionError.PERMISSION_DENIED) {
-            toast({
-              title: "Location Permission Required",
-              description: "Please allow location access to fetch soil data from your area",
-              variant: "destructive",
-            });
-          } else if (locationError.code === GeolocationPositionError.POSITION_UNAVAILABLE) {
-            toast({
-              title: "Location Unavailable",
-              description: "Unable to determine your location. Using default coordinates.",
-            });
-          } else {
-            toast({
-              title: "Location Timeout",
-              description: "Location request timed out. Using default coordinates.",
-            });
-          }
-        }
+        toast({
+          title: "Location found",
+          description: `Using coordinates: ${coordinates.lat.toFixed(4)}°N, ${coordinates.lon.toFixed(4)}°E`,
+        });
+      } catch (error: any) {
+        console.error('❌ Location error:', error);
         
         // Use default coordinates for demonstration (New Delhi area)
         coordinates = { lat: 28.6139, lon: 77.2090 };
         
         toast({
-          title: "Using default location",
-          description: "Fetching soil data for New Delhi region as fallback",
+          title: error.message || "Location Error",
+          description: "Using default location (New Delhi) as fallback. Please enable location access for better recommendations.",
+          variant: "destructive",
         });
       }
 
+      // Fetch soil health data
+      console.log('🌱 Fetching soil data for coordinates:', coordinates);
       const soilData = await getSoilHealthData(coordinates);
+      console.log('✅ Received soil data:', soilData);
+      
+      // Update state and form
       setSoilHealthData(soilData);
       
-      // Auto-populate form with soil health card data
+      // Auto-populate form fields
       form.setValue('soilType', soilData.soilType);
       form.setValue('pH', soilData.pH);
       form.setValue('nitrogen', soilData.nitrogen);
@@ -115,12 +112,13 @@ const Recommendation = () => {
       toast({
         title: "Soil data loaded!",
         description: `Found soil health data for your location`,
+        variant: "default"
       });
-    } catch (error) {
-      console.error('Error fetching soil data:', error);
+    } catch (error: any) {
+      console.error('❌ Error fetching soil data:', error);
       toast({
-        title: "Soil data service error",
-        description: "Unable to connect to soil health database. Please try again later.",
+        title: "Soil data error",
+        description: error.message || "Failed to fetch soil health data. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -129,46 +127,64 @@ const Recommendation = () => {
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('🖼️ Image upload triggered');
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Basic client-side checks
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "Please select an image smaller than 5MB",
-        variant: "destructive",
-      });
+    
+    if (!file) {
+      console.log('❌ No file selected');
       return;
     }
 
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-    if (!allowedTypes.includes(file.type)) {
-      toast({
-        title: "Invalid file type",
-        description: "Please select a JPEG or PNG image",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Set preview immediately so user gets instant feedback
-    setCropImage(file);
-    setImageValid(null); // pending validation
-    setCropAnalysis(null);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setImagePreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-
-    // Perform immediate client-side validation/analysis. If it fails, clear the image and show error.
     try {
+      console.log('📝 Processing file:', file.name, file.type, file.size);
+
+      // Basic client-side checks
+      if (file.size > 5 * 1024 * 1024) {
+        console.log('❌ File too large:', file.size);
+        toast({
+          title: "File too large",
+          description: "Please select an image smaller than 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+      if (!allowedTypes.includes(file.type)) {
+        console.log('❌ Invalid file type:', file.type);
+        toast({
+          title: "Invalid file type",
+          description: "Please select a JPEG or PNG image",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Set preview immediately for instant feedback
+      setCropImage(file);
+      setImageValid(null); // pending validation
+      setCropAnalysis(null);
+
+      // Convert to base64 and set preview
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+      });
+      setImagePreview(base64);
+
+      // Validate and analyze the image
       toast({ title: 'Validating image...', description: 'Checking that uploaded image contains crop/leaf' });
       const result = await analyzeCropImage(file);
-      // If analyzeCropImage resolves, it's treated as valid
       setCropAnalysis(result);
       setImageValid(true);
+      
+      toast({
+        title: "Image processed",
+        description: "Crop image loaded and validated successfully",
+        variant: "default",
+      });
       toast({ title: 'Image validated', description: `Crop health: ${result.cropHealth}` });
     } catch (err: any) {
       console.error('Image validation failed on upload:', err);
@@ -177,6 +193,70 @@ const Recommendation = () => {
       setImageValid(false);
       setCropAnalysis(null);
       toast({ title: 'Invalid image', description: err?.message || 'Please upload a clear image of crops or leaves', variant: 'destructive' });
+    }
+  };
+
+  const handleSHCUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('📄 SHC upload triggered');
+    const file = event.target.files?.[0];
+    
+    if (!file) {
+      console.log('❌ No file selected');
+      return;
+    }
+
+    setIsLoadingSoilData(true);
+
+    try {
+      console.log('📝 Processing SHC:', file.name, file.type, file.size);
+
+      // Basic client-side checks
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error('File size must be less than 5MB');
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error('Please select a JPEG or PNG image');
+      }
+
+      toast({
+        title: "Processing Soil Health Card",
+        description: "Uploading and analyzing your SHC...",
+      });
+
+      // Upload and process the soil health card
+      const soilData = await uploadSoilHealthCard(file);
+      console.log('✅ Soil health card processed:', soilData);
+
+      // Update state and form
+      setSoilHealthData(soilData);
+      
+      // Auto-populate form fields
+      form.setValue('soilType', soilData.soilType);
+      form.setValue('pH', soilData.pH);
+      form.setValue('nitrogen', soilData.nitrogen);
+      form.setValue('phosphorus', soilData.phosphorus);
+      form.setValue('potassium', soilData.potassium);
+      form.setValue('organicCarbon', soilData.organicCarbon);
+
+      toast({
+        title: "Soil Health Card Processed!",
+        description: "Your soil data has been successfully loaded",
+        variant: "default"
+      });
+
+    } catch (error: any) {
+      console.error('❌ SHC processing failed:', error);
+      toast({
+        title: "Error Processing SHC",
+        description: error.message || "Failed to process Soil Health Card. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingSoilData(false);
+      // Clear the file input
+      event.target.value = '';
     }
   };
 
@@ -555,24 +635,59 @@ const Recommendation = () => {
                     <p className="text-muted-foreground mb-6">
                       Enter your farm's geolocation to automatically fetch soil analysis data from your Soil Health Card
                     </p>
-                    <Button 
-                      type="button" 
-                      onClick={fetchSoilData}
-                      disabled={isLoadingSoilData || isLoading}
-                      className="bg-earth hover:bg-earth/90 text-white"
-                    >
-                      {isLoadingSoilData ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          Fetching Location...
-                        </>
-                      ) : (
-                        <>
-                          <MapPin className="h-4 w-4 mr-2" />
-                          Get Soil Data from Location
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex flex-col gap-4 items-center justify-center">
+                      <Button 
+                        type="button" 
+                        onClick={fetchSoilData}
+                        disabled={isLoadingSoilData || isLoading}
+                        className="bg-earth hover:bg-earth/90 text-white"
+                      >
+                        {isLoadingSoilData ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Fetching Location...
+                          </>
+                        ) : (
+                          <>
+                            <MapPin className="h-4 w-4 mr-2" />
+                            Get Soil Data from Location
+                          </>
+                        )}
+                      </Button>
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">OR</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="file"
+                          id="shc-upload"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleSHCUpload}
+                          disabled={isLoadingSoilData || isLoading}
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => document.getElementById('shc-upload')?.click()}
+                          disabled={isLoadingSoilData || isLoading}
+                          variant="secondary"
+                        >
+                          {isLoadingSoilData ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Processing SHC...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-4 w-4 mr-2" />
+                              Upload Soil Health Card
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="animate-in slide-in-from-bottom-4 duration-700 space-y-6">
