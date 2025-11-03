@@ -1,366 +1,196 @@
-import { supabase } from "@/integrations/supabase/client";
-import { WeatherData } from './weatherService';
-import { CropAnalysisResult } from './cropAnalysisService';
+// src/pages/Recommendation.tsx
+import React, { useState } from "react";
+import { SoilHealthService } from "@/services/SoilHealthService";
+import { analyzeCropImage } from "@/services/cropAnalysisService";
+import "@/index.css"; // Ensure you keep your base styles imported
 
-export interface SoilData {
-  soilType: 'sandy' | 'loamy' | 'clayey' | 'silty';
-  pH: number;
-  nitrogen: number; // ppm
-  phosphorus: number; // ppm
-  potassium: number; // ppm
-  organicCarbon: number; // %
-}
+export default function Recommendation() {
+  const [cropImageFile, setCropImageFile] = useState<File | null>(null);
+  const [cropPreview, setCropPreview] = useState<string | null>(null);
+  const [currentCropAnalysis, setCurrentCropAnalysis] = useState<any>(null);
 
-export interface FertilizerRecommendation {
-  nitrogen: number; // kg/ha
-  phosphorus: number; // kg/ha (P2O5)
-  potassium: number; // kg/ha (K2O)
-}
+  // ✅ Simple Toast System
+  const showToast = (title: string, description: string, type: string = "default") => {
+    let container = document.getElementById("toast-container");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "toast-container";
+      container.className = "toast-container";
+      document.body.appendChild(container);
+    }
 
-export interface ProductRecommendation {
-  name: string;
-  type: 'urea' | 'dap' | 'mop' | 'complex' | 'organic';
-  quantity: number; // kg/ha
-  applicationTiming: string;
-  method: string;
-}
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+      <div class="toast-title">${title}</div>
+      <div class="toast-description">${description}</div>
+    `;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  };
 
-export interface ApplicationSchedule {
-  stage: string;
-  daysAfterPlanting: number;
-  fertilizers: string[];
-  quantity: string;
-  method: string;
-}
+  // ✅ Fetch Soil Data via Mock Service
+  const fetchSoilData = async () => {
+    const btn = document.getElementById("fetch-soil-btn") as HTMLButtonElement | null;
+    if (!btn) return;
 
-export interface RecommendationResult {
-  fertilizer: FertilizerRecommendation;
-  products: ProductRecommendation[];
-  sustainabilityScore: number;
-  applicationSchedule: ApplicationSchedule[];
-  weatherConsiderations: string[];
-  expectedYieldIncrease: number; // percentage
-  costEstimate: number; // USD per hectare
-}
+    btn.disabled = true;
+    btn.textContent = "Fetching...";
 
-export const generateRecommendation = async (
-  cropType: string,
-  soilData: SoilData,
-  weatherData: WeatherData,
-  cropAnalysis?: CropAnalysisResult,
-  imageData?: string,
-  latitude?: number,
-  longitude?: number
-): Promise<RecommendationResult> => {
-  try {
-    console.log('Calling getFertilizerRecommendation edge function...');
-    
-    // Call the new unified edge function
-    const { data, error } = await supabase.functions.invoke('getFertilizerRecommendation', {
-      body: { 
-        cropType,
-        soilType: soilData.soilType,
+    try {
+      showToast("Requesting location...", "Allow browser access to continue.");
+
+      // Get coordinates
+      const coordinates = await new Promise<{ lat: number; lon: number }>((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) =>
+            resolve({
+              lat: pos.coords.latitude,
+              lon: pos.coords.longitude,
+            }),
+          () => {
+            showToast("Location denied", "Using default: New Delhi", "error");
+            resolve({ lat: 28.6139, lon: 77.209 });
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      });
+
+      console.log("🌍 Coordinates:", coordinates);
+
+      const soilData = await SoilHealthService.getSoilHealthData(coordinates);
+      if (!soilData) throw new Error("No soil data found");
+
+      const mapping: Record<string, any> = {
         pH: soilData.pH,
         nitrogen: soilData.nitrogen,
         phosphorus: soilData.phosphorus,
         potassium: soilData.potassium,
         organicCarbon: soilData.organicCarbon,
-        latitude,
-        longitude,
-        imageData
-      }
-    });
+      };
 
-    if (error) {
-      console.error('Error calling getFertilizerRecommendation:', error);
-      throw error;
+      // Populate form fields
+      Object.entries(mapping).forEach(([id, value]) => {
+        const input = document.getElementById(id) as HTMLInputElement | null;
+        if (input) input.value = value;
+      });
+
+      showToast("Soil data loaded ✅", `Card: ${soilData.cardNumber}`, "success");
+    } catch (error: any) {
+      console.error("❌ Soil data error:", error);
+      showToast("Soil data service error", error.message || "Unknown error", "error");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = `
+        <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+        </svg>
+        Fetch from SHC
+      `;
     }
-
-    if (!data) {
-      console.warn('No data received from edge function');
-      throw new Error('No recommendation data received');
-    }
-
-    console.log('Recommendation received from edge function:', data);
-    return data as RecommendationResult;
-  } catch (error) {
-    console.error('Error generating recommendation:', error);
-    // Fallback to local generation if edge function fails
-    return generateLocalRecommendation(cropType, soilData, weatherData, cropAnalysis);
-  }
-};
-
-// New function to get ML predictions
-const getMLPrediction = async (
-  cropType: string,
-  soilData: SoilData,
-  weatherData: WeatherData,
-  cropAnalysis?: CropAnalysisResult
-) => {
-  try {
-    console.log('Calling ML prediction service with data:', {
-      cropType,
-      soilData,
-      weatherData
-    });
-
-    const { data, error } = await supabase.functions.invoke('ml-prediction', {
-      body: {
-        N: soilData.nitrogen,
-        P: soilData.phosphorus,
-        K: soilData.potassium,
-        pH: soilData.pH,
-        organicCarbon: soilData.organicCarbon,
-        cropType: cropType,
-        soilType: soilData.soilType,
-        temperature: weatherData.temperature,
-        rainfall: weatherData.rainfall,
-        humidity: weatherData.humidity
-      }
-    });
-
-    if (error) {
-      console.error('ML prediction error:', error);
-      return null;
-    }
-
-    console.log('ML Prediction successful:', data);
-    return data;
-  } catch (error) {
-    console.error('Error calling ML prediction service:', error);
-    return null;
-  }
-};
-
-// Fallback local recommendation generation
-const generateLocalRecommendation = (
-  cropType: string,
-  soilData: SoilData,
-  weatherData: WeatherData,
-  cropAnalysis?: CropAnalysisResult,
-  mlPrediction?: any // Add ML prediction parameter
-): RecommendationResult => {
-  
-  // Base fertilizer requirements by crop type
-  const cropRequirements: Record<string, FertilizerRecommendation> = {
-    rice: { nitrogen: 120, phosphorus: 60, potassium: 40 },
-    wheat: { nitrogen: 150, phosphorus: 80, potassium: 60 },
-    maize: { nitrogen: 180, phosphorus: 90, potassium: 70 },
-    millets: { nitrogen: 60, phosphorus: 40, potassium: 30 }
   };
-  
-  let baseRecommendation = cropRequirements[cropType.toLowerCase()] || cropRequirements.rice;
-  
-  // Use ML prediction if available to enhance base recommendation
-  if (mlPrediction?.prediction) {
-    console.log('Using ML prediction to enhance recommendation:', mlPrediction.prediction);
-    
-    // Adjust base recommendation based on ML prediction
-    const mlFertilizerType = mlPrediction.prediction.type;
-    const mlAmount = mlPrediction.prediction.amount;
-    const mlConfidence = mlPrediction.prediction.confidence;
-    
-    // Apply ML adjustments based on fertilizer type and confidence
-    if (mlConfidence > 0.7) {
-      switch (mlFertilizerType) {
-        case 'Urea':
-          baseRecommendation.nitrogen = Math.round(baseRecommendation.nitrogen * 1.2);
-          break;
-        case 'DAP':
-          baseRecommendation.phosphorus = Math.round(baseRecommendation.phosphorus * 1.3);
-          break;
-        case 'MOP':
-          baseRecommendation.potassium = Math.round(baseRecommendation.potassium * 1.3);
-          break;
-        case 'NPK':
-          baseRecommendation.nitrogen = Math.round(baseRecommendation.nitrogen * 1.1);
-          baseRecommendation.phosphorus = Math.round(baseRecommendation.phosphorus * 1.1);
-          baseRecommendation.potassium = Math.round(baseRecommendation.potassium * 1.1);
-          break;
-      }
+
+  // ✅ Handle Image Upload + Preview
+  const handleCropImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const previewUrl = URL.createObjectURL(file);
+    setCropImageFile(file);
+    setCropPreview(previewUrl);
+    showToast("Analyzing crop image...", "Please wait a moment.");
+
+    try {
+      const analysis = await analyzeCropImage(file);
+      console.log("✅ Crop analysis result:", analysis);
+      setCurrentCropAnalysis(analysis);
+      showToast("Crop image validated ✅", `Health: ${analysis.cropHealth}`, "success");
+    } catch (err: any) {
+      console.error("❌ Image analysis failed:", err);
+      showToast("Crop analysis failed", err.message, "error");
     }
-  }
-  
-  // Adjust based on soil analysis
-  const pHAdjustment = soilData.pH < 6.0 ? 1.1 : soilData.pH > 8.0 ? 0.9 : 1.0;
-  const soilTypeAdjustment = {
-    sandy: { n: 1.2, p: 1.1, k: 1.3 }, // Sandy soils need more nutrients
-    loamy: { n: 1.0, p: 1.0, k: 1.0 }, // Ideal soil
-    clayey: { n: 0.9, p: 1.2, k: 0.8 }, // Clay retains nutrients
-    silty: { n: 1.0, p: 1.0, k: 1.1 }
   };
-  
-  const adjustment = soilTypeAdjustment[soilData.soilType];
-  
-  // Adjust for existing soil nutrients
-  const nitrogenAdjustment = Math.max(0.3, 1 - (soilData.nitrogen / 300));
-  const phosphorusAdjustment = Math.max(0.3, 1 - (soilData.phosphorus / 50));
-  const potassiumAdjustment = Math.max(0.3, 1 - (soilData.potassium / 200));
-  
-  // Weather adjustments
-  const rainfallAdjustment = weatherData.rainfall > 5 ? 1.1 : 0.95; // More rain = more leaching
-  const temperatureAdjustment = weatherData.temperature > 30 ? 1.05 : 1.0;
-  
-  // Crop analysis adjustments
-  let cropHealthAdjustment = 1.0;
-  if (cropAnalysis) {
-    switch (cropAnalysis.cropHealth) {
-      case 'poor': cropHealthAdjustment = 1.3; break;
-      case 'fair': cropHealthAdjustment = 1.15; break;
-      case 'good': cropHealthAdjustment = 1.0; break;
-      case 'excellent': cropHealthAdjustment = 0.9; break;
-    }
-  }
-  
-  // Calculate final recommendation
-  const finalRecommendation: FertilizerRecommendation = {
-    nitrogen: Math.round(baseRecommendation.nitrogen * 
-              pHAdjustment * adjustment.n * nitrogenAdjustment * 
-              rainfallAdjustment * temperatureAdjustment * cropHealthAdjustment),
-    phosphorus: Math.round(baseRecommendation.phosphorus * 
-                pHAdjustment * adjustment.p * phosphorusAdjustment * temperatureAdjustment),
-    potassium: Math.round(baseRecommendation.potassium * 
-               pHAdjustment * adjustment.k * potassiumAdjustment * temperatureAdjustment)
-  };
-  
-  // Generate product recommendations
-  const products: ProductRecommendation[] = [
-    {
-      name: "Urea (46% N)",
-      type: "urea",
-      quantity: Math.round(finalRecommendation.nitrogen / 0.46),
-      applicationTiming: "Split application - 50% at planting, 30% at tillering, 20% at flowering",
-      method: "Broadcasting and incorporation"
-    },
-    {
-      name: "DAP (18-46-0)",
-      type: "dap",
-      quantity: Math.round(finalRecommendation.phosphorus / 0.46),
-      applicationTiming: "Full dose at planting",
-      method: "Band placement near seed"
-    },
-    {
-      name: "Muriate of Potash (60% K2O)",
-      type: "mop",
-      quantity: Math.round(finalRecommendation.potassium / 0.6),
-      applicationTiming: "50% at planting, 50% at flowering",
-      method: "Broadcasting and incorporation"
-    }
-  ];
-  
-  // If organic carbon is low, add organic fertilizer
-  if (soilData.organicCarbon < 1.0) {
-    products.push({
-      name: "Compost/FYM",
-      type: "organic",
-      quantity: 2500,
-      applicationTiming: "2-3 weeks before planting",
-      method: "Broadcasting and deep incorporation"
-    });
-  }
-  
-  // Generate application schedule
-  const applicationSchedule: ApplicationSchedule[] = [
-    {
-      stage: "Land Preparation",
-      daysAfterPlanting: -14,
-      fertilizers: soilData.organicCarbon < 1.0 ? ["Compost/FYM", "Full P2O5", "50% K2O"] : ["Full P2O5", "50% K2O"],
-      quantity: "As recommended",
-      method: "Broadcasting and incorporation"
-    },
-    {
-      stage: "Planting",
-      daysAfterPlanting: 0,
-      fertilizers: ["50% Nitrogen"],
-      quantity: `${Math.round(finalRecommendation.nitrogen * 0.5)} kg N/ha`,
-      method: "Band placement or starter fertilizer"
-    },
-    {
-      stage: "Vegetative Growth",
-      daysAfterPlanting: 30,
-      fertilizers: ["30% Nitrogen"],
-      quantity: `${Math.round(finalRecommendation.nitrogen * 0.3)} kg N/ha`,
-      method: "Side dressing or foliar application"
-    },
-    {
-      stage: "Reproductive Phase",
-      daysAfterPlanting: 60,
-      fertilizers: ["20% Nitrogen", "50% K2O"],
-      quantity: `${Math.round(finalRecommendation.nitrogen * 0.2)} kg N/ha + ${Math.round(finalRecommendation.potassium * 0.5)} kg K2O/ha`,
-      method: "Foliar spray or fertigation"
-    }
-  ];
-  
-  // Weather considerations
-  const weatherConsiderations: string[] = [];
-  if (weatherData.rainfall > 8) {
-    weatherConsiderations.push("High rainfall expected - consider split applications to reduce nutrient loss");
-  }
-  if (weatherData.temperature > 32) {
-    weatherConsiderations.push("High temperature - apply fertilizers early morning or late evening");
-  }
-  if (weatherData.humidity > 80) {
-    weatherConsiderations.push("High humidity - ensure good ventilation for foliar applications");
-  }
-  if (weatherData.windSpeed > 10) {
-    weatherConsiderations.push("High wind speed - avoid foliar applications");
-  }
-  
-  // Calculate sustainability score dynamically (0-100) based on multiple factors
-  let sustainabilityScore = 30; // Lower base for more variation
-  
-  // 1. Soil health contribution (0-25 points)
-  const soilQualityScore = Math.min(25,
-    (soilData.organicCarbon * 8) + // Organic carbon importance (0-12 points)
-    (soilData.pH >= 6.0 && soilData.pH <= 7.5 ? 8 : Math.max(0, 8 - Math.abs(soilData.pH - 6.75) * 3)) + // pH optimality (0-8 points)
-    (soilData.soilType === 'loamy' ? 5 : soilData.soilType === 'silty' ? 3 : 0) // Soil type bonus (0-5 points)
+
+  return (
+    <div className="app">
+      <h2>Sustainable Fertilizer Usage Optimizer</h2>
+
+      {/* 🌱 Soil Section */}
+      <section className="soil-section">
+        <h3>Soil Analysis Data</h3>
+        <button id="fetch-soil-btn" onClick={fetchSoilData}>
+          <svg
+            className="btn-icon"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+            />
+          </svg>
+          Fetch from SHC
+        </button>
+
+        <div className="form-grid">
+          <input id="pH" placeholder="Soil pH" />
+          <input id="nitrogen" placeholder="Nitrogen (ppm)" />
+          <input id="phosphorus" placeholder="Phosphorus (ppm)" />
+          <input id="potassium" placeholder="Potassium (ppm)" />
+          <input id="organicCarbon" placeholder="Organic Carbon (%)" />
+        </div>
+      </section>
+
+      {/* 🌿 Crop Image Upload */}
+      <section className="crop-upload-section">
+        <h3>Crop Image Analysis</h3>
+        <label htmlFor="crop-image">Upload crop image for AI analysis</label>
+        <input
+          type="file"
+          id="crop-image"
+          accept="image/*"
+          onChange={handleCropImageChange}
+        />
+
+        {cropPreview && (
+          <img
+            src={cropPreview}
+            alt="Crop Preview"
+            style={{
+              width: "200px",
+              marginTop: "10px",
+              borderRadius: "8px",
+              display: "block",
+            }}
+          />
+        )}
+      </section>
+
+      {/* Analysis Results */}
+      {currentCropAnalysis && (
+        <section className="results-section">
+          <h3>AI Crop Health Report</h3>
+          <p>Health: {currentCropAnalysis.cropHealth}</p>
+          <p>Confidence: {(currentCropAnalysis.confidence * 100).toFixed(1)}%</p>
+          {currentCropAnalysis.deficiencies?.length > 0 ? (
+            <ul>
+              {currentCropAnalysis.deficiencies.map((d: any, i: number) => (
+                <li key={i}>
+                  {d.nutrient.toUpperCase()} - {d.severity} ({Math.round(d.confidence * 100)}%)
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No major deficiencies detected ✅</p>
+          )}
+        </section>
+      )}
+
+      <div id="toast-container" className="toast-container"></div>
+    </div>
   );
-  sustainabilityScore += soilQualityScore;
-  
-  // 2. Fertilizer efficiency (0-25 points) - rewards lower usage
-  const totalNutrients = finalRecommendation.nitrogen + finalRecommendation.phosphorus + finalRecommendation.potassium;
-  const fertilizerEfficiency = Math.max(0, 25 - (totalNutrients / 15)); // Lower usage = higher score
-  sustainabilityScore += fertilizerEfficiency;
-  
-  // 3. Existing nutrient utilization (0-15 points) - rewards using soil's existing nutrients
-  const nutrientUtilization = Math.min(15,
-    (soilData.nitrogen / 300) * 5 +
-    (soilData.phosphorus / 50) * 5 +
-    (soilData.potassium / 200) * 5
-  );
-  sustainabilityScore += nutrientUtilization;
-  
-  // 4. Weather adaptation (0-15 points) - optimal conditions
-  const weatherScore = Math.min(15,
-    (weatherData.rainfall > 2 && weatherData.rainfall < 8 ? 8 : Math.max(0, 8 - Math.abs(weatherData.rainfall - 5))) + // Optimal rainfall
-    (weatherData.temperature > 20 && weatherData.temperature < 35 ? 7 : Math.max(0, 7 - Math.abs(weatherData.temperature - 27.5) * 0.3)) // Optimal temperature
-  );
-  sustainabilityScore += weatherScore;
-  
-  // 5. Crop health impact (0-20 points)
-  const cropHealthScore = cropAnalysis ?
-    { 'excellent': 20, 'good': 14, 'fair': 7, 'poor': 0 }[cropAnalysis.cropHealth] || 10 : 10;
-  sustainabilityScore += cropHealthScore;
-  
-  // Ensure score stays within 0-100 range
-  sustainabilityScore = Math.min(100, Math.max(0, Math.round(sustainabilityScore)));
-  
-  // Estimate yield increase and cost
-  const expectedYieldIncrease = Math.round(5 + (sustainabilityScore - 50) * 0.4); // 5-25% increase
-  const costEstimate = Math.round(
-    (finalRecommendation.nitrogen * 0.8) + 
-    (finalRecommendation.phosphorus * 1.2) + 
-    (finalRecommendation.potassium * 0.6) +
-    (soilData.organicCarbon < 1.0 ? 50 : 0) // Organic matter cost
-  );
-  
-  return {
-    fertilizer: finalRecommendation,
-    products,
-    sustainabilityScore,
-    applicationSchedule,
-    weatherConsiderations,
-    expectedYieldIncrease,
-    costEstimate
-  };
-};
+}
