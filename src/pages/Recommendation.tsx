@@ -63,22 +63,23 @@ const Recommendation = () => {
     setIsLoadingSoilData(true);
     
     try {
-      // First ask for location permission
-      toast({
-        title: "Location Access",
-        description: "Please allow location access to get accurate soil data for your area.",
-      });
-
       let coordinates: { lat: number; lon: number };
       
+      // Show prominent toast first
+      toast({
+        title: "📍 Location Permission Required",
+        description: "Your browser will ask for location access. Please click 'Allow' to get accurate soil data for your area.",
+        duration: 5000,
+      });
+
       try {
         console.log('🔍 Requesting location permission...');
         coordinates = await getUserLocation();
         console.log('✅ Location permission granted:', coordinates);
         
         toast({
-          title: "Location found",
-          description: `Using coordinates: ${coordinates.lat.toFixed(4)}°N, ${coordinates.lon.toFixed(4)}°E`,
+          title: "✅ Location Detected",
+          description: `Found: ${coordinates.lat.toFixed(4)}°N, ${coordinates.lon.toFixed(4)}°E`,
         });
       } catch (error: any) {
         console.error('❌ Location error:', error);
@@ -87,9 +88,10 @@ const Recommendation = () => {
         coordinates = { lat: 28.6139, lon: 77.2090 };
         
         toast({
-          title: error.message || "Location Error",
-          description: "Using default location (New Delhi) as fallback. Please enable location access for better recommendations.",
+          title: "⚠️ Using Default Location",
+          description: "Location access denied. Using New Delhi as default. Enable location for accurate results.",
           variant: "destructive",
+          duration: 7000,
         });
       }
 
@@ -537,31 +539,31 @@ const Recommendation = () => {
                   </Label>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
-                      <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
-                        <input
-                          type="file"
-                          id="crop-image"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                          className="hidden"
-                          disabled={isLoading}
-                        />
-                        <label 
-                          htmlFor="crop-image" 
-                          className="cursor-pointer flex flex-col items-center space-y-2"
-                        >
-                          <Camera className="h-8 w-8 text-muted-foreground" />
-                          <div className="text-sm text-muted-foreground">
+                      <input
+                        type="file"
+                        id="crop-image"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={isLoading}
+                      />
+                      <label 
+                        htmlFor="crop-image" 
+                        className="cursor-pointer block"
+                      >
+                        <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
+                          <Camera className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                          <div className="text-sm text-muted-foreground mb-2">
                             Upload crop image for AI analysis
                           </div>
-                          <Button type="button" size="sm" className="mt-2">
+                          <div className="inline-flex items-center px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium">
                             <Upload className="h-4 w-4 mr-2" />
                             Choose Image
-                          </Button>
-                        </label>
-                      </div>
+                          </div>
+                        </div>
+                      </label>
                       <p className="text-xs text-muted-foreground mt-2">
-                        Max 5MB • JPEG, PNG supported
+                        Max 5MB • JPEG, PNG supported • Only crop/plant images
                       </p>
                     </div>
                     
