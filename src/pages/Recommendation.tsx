@@ -16,7 +16,7 @@ import { Loader2, Upload, Camera, MapPin, Brain, Leaf } from "lucide-react";
 import { getWeatherData, getUserLocation, WeatherData } from "@/services/weatherService";
 import { analyzeCropImage, CropAnalysisResult } from "@/services/cropAnalysisService";
 import { generateRecommendation, RecommendationResult, SoilData } from "@/services/recommendationEngine";
-import { getSoilHealthData, SoilHealthData } from "@/services/soilHealthService";
+import { getSoilHealthData, SoilHealthData, uploadSoilHealthCard } from "@/services/soilHealthService";
 
 const formSchema = z.object({
   soilType: z.enum(["sandy", "loamy", "clayey", "silty"], {
