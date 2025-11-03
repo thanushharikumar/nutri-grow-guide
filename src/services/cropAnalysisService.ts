@@ -71,27 +71,69 @@ const analyzeLeafColor = (data: Uint8ClampedArray): ColorAnalysis => {
   };
 };
 
+/**
+ * Validate crop image using Google Vision API via edge function
+ */
+const validateCropImage = async (imageFile: File): Promise<boolean> => {
+  const reader = new FileReader();
+  
+  return new Promise((resolve, reject) => {
+    reader.onload = async () => {
+      try {
+        const base64 = (reader.result as string).split(',')[1];
+        
+        const response = await supabase.functions.invoke('validate-crop-image', {
+          body: { image: base64 }
+        });
+
+        if (response.error) {
+          console.error('Validation error:', response.error);
+          reject(new Error(response.error.message || 'Failed to validate image'));
+          return;
+        }
+
+        if (!response.data?.valid) {
+          reject(new Error(response.data?.message || 'Invalid crop image'));
+          return;
+        }
+
+        console.log('✅ Image validated by Google Vision API:', response.data);
+        resolve(true);
+      } catch (error: any) {
+        console.error('Validation request failed:', error);
+        reject(new Error('Failed to validate image'));
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Failed to read image file'));
+    reader.readAsDataURL(imageFile);
+  });
+};
+
 export const analyzeCropImage = async (imageFile: File): Promise<CropAnalysisResult> => {
   console.log('Starting AI-powered crop image analysis for:', imageFile.name);
 
+  // Immediate file validation
+  if (!imageFile) {
+    throw new Error('No image file provided');
+  }
+
+  // Validate file size (max 5MB)
+  if (imageFile.size > 5 * 1024 * 1024) {
+    throw new Error('Image file is too large. Please upload an image smaller than 5MB.');
+  }
+
+  // Validate file type
+  if (!['image/jpeg', 'image/png', 'image/jpg'].includes(imageFile.type)) {
+    throw new Error('Invalid file type. Please upload a JPEG or PNG image.');
+  }
+
+  // First, validate with Google Vision API
+  console.log('🔍 Validating image with Google Vision API...');
+  await validateCropImage(imageFile);
+  console.log('✅ Image validated as crop/plant image');
+
   return new Promise((resolve, reject) => {
-    // Immediate file validation
-    if (!imageFile) {
-      reject(new Error('No image file provided'));
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (imageFile.size > 5 * 1024 * 1024) {
-      reject(new Error('Image file is too large. Please upload an image smaller than 5MB.'));
-      return;
-    }
-
-    // Validate file type
-    if (!['image/jpeg', 'image/png', 'image/jpg'].includes(imageFile.type)) {
-      reject(new Error('Invalid file type. Please upload a JPEG or PNG image.'));
-      return;
-    }
 
     const reader = new FileReader();
 
