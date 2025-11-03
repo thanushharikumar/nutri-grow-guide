@@ -82,7 +82,11 @@ export const validateSoilHealthCard = async (cardNumber: string): Promise<boolea
 
 export const searchNearbyFarms = async (coordinates: Coordinates, radius: number = 5): Promise<SoilHealthData[]> => {
   const region = getRegionFromCoordinates(coordinates);
+<<<<<<< HEAD
   const baseData = mockSoilData[region] || mockSoilData['North India']; // Use mockSoilData here
+=======
+  const baseData = mockSoilData[region] || mockSoilData['North India'];
+>>>>>>> f9a669d97db9ca145c0fc387fc0084261b776666
   
   const nearbyFarms: SoilHealthData[] = [];
   const farmCount = 3 + Math.floor(Math.random() * 3);
