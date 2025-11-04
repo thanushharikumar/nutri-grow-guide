@@ -107,34 +107,87 @@ export const searchNearbyFarms = async (coordinates: Coordinates, radius: number
 };
 
 export const uploadSoilHealthCard = async (file: File): Promise<SoilHealthData> => {
-  console.log('📄 Simulating SHC upload and processing for file:', file.name);
+  console.log('📄 Processing Soil Health Card:', file.name);
 
-  // In a real application, this would involve:
-  // 1. Uploading the file to a storage service (e.g., Supabase Storage)
-  // 2. Calling an AI/ML service (e.g., a Supabase Edge Function) to perform OCR
-  //    and extract soil data from the image.
-  // 3. Validating the extracted data.
+  try {
+    // Convert image to base64
+    const base64Image = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove data URL prefix to get just the base64 content
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
 
-  // For now, we'll simulate a delay and return mock data.
-  await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate network delay
+    console.log('📤 Sending image to OCR service...');
 
-  // Return a fixed mock soil data for demonstration purposes
-  const mockUploadedSoilData: SoilHealthData = {
-    soilType: 'loamy',
-    pH: 6.8,
-    nitrogen: 220,
-    phosphorus: 35,
-    potassium: 180,
-    organicCarbon: 1.5,
-    electricalConductivity: 0.5,
-    micronutrients: { iron: 18, manganese: 9, zinc: 1.0, copper: 0.7 },
-    location: {
-      latitude: 28.6139, // Default to New Delhi for mock
-      longitude: 77.2090
-    },
-    lastUpdated: new Date()
-  };
+    // Call the extract-soil-health-card edge function
+    const { data, error } = await supabase.functions.invoke('extract-soil-health-card', {
+      body: { image: base64Image }
+    });
 
-  console.log('✅ Simulated SHC processing complete, returning mock data:', mockUploadedSoilData);
-  return mockUploadedSoilData;
+    if (error) {
+      console.error('OCR service error:', error);
+      throw new Error('Failed to process Soil Health Card. Please try again.');
+    }
+
+    if (!data.success) {
+      console.error('OCR extraction failed:', data.error);
+      throw new Error(data.error || 'Could not extract data from the Soil Health Card');
+    }
+
+    console.log('✅ OCR extraction successful:', data.extractedData);
+
+    const extracted = data.extractedData;
+
+    // Get user's current location for the soil data
+    let latitude = 28.6139; // Default to Delhi
+    let longitude = 77.2090;
+    
+    try {
+      const coords = await import('./weatherService').then(m => m.getUserLocation());
+      latitude = coords.lat;
+      longitude = coords.lon;
+    } catch {
+      console.log('Using default coordinates');
+    }
+
+    // Build soil health data from extracted information
+    const soilData: SoilHealthData = {
+      soilType: (extracted.soilType as any) || 'loamy', // Default if not detected
+      pH: extracted.pH || 6.5,
+      nitrogen: extracted.nitrogen || 150,
+      phosphorus: extracted.phosphorus || 25,
+      potassium: extracted.potassium || 120,
+      organicCarbon: extracted.organicCarbon || 1.2,
+      electricalConductivity: 0.5, // This is rarely on SHC, use default
+      micronutrients: {
+        iron: 15,
+        manganese: 8,
+        zinc: 0.8,
+        copper: 0.6
+      },
+      location: {
+        latitude,
+        longitude
+      },
+      lastUpdated: new Date()
+    };
+
+    // Warn if confidence is low
+    if (extracted.confidence < 0.6) {
+      console.warn('⚠️ Low confidence extraction:', extracted.confidence);
+    }
+
+    console.log('✅ Soil Health Card processed successfully:', soilData);
+    return soilData;
+
+  } catch (error: any) {
+    console.error('❌ Error processing Soil Health Card:', error);
+    throw new Error(error.message || 'Failed to process Soil Health Card');
+  }
 };

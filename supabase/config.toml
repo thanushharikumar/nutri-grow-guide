@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.validate-crop-image]
 verify_jwt = false
+
+[functions.extract-soil-health-card]
+verify_jwt = false
