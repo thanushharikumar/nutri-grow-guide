@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, Camera, MapPin, Brain, Leaf } from "lucide-react";
+import { Loader2, Upload, Camera, MapPin, Brain, Leaf, Database, CloudCog, FileText } from "lucide-react";
 import { getWeatherData, getUserLocation, WeatherData } from "@/services/weatherService";
 import { analyzeCropImage, CropAnalysisResult } from "@/services/cropAnalysisService";
 import { generateRecommendation, RecommendationResult, SoilData } from "@/services/recommendationEngine";
@@ -111,10 +111,14 @@ const Recommendation = () => {
       form.setValue('potassium', soilData.potassium);
       form.setValue('organicCarbon', soilData.organicCarbon);
 
+      const sourceMessage = soilData.dataSource === 'soilgrids-api' 
+        ? 'Real-time data from SoilGrids Global Database'
+        : 'Using regional sample data (SoilGrids unavailable)';
+      
       toast({
         title: "Soil data loaded!",
-        description: `Found soil health data for your location`,
-        variant: "default"
+        description: sourceMessage,
+        variant: soilData.dataSource === 'soilgrids-api' ? "default" : "default"
       });
     } catch (error: any) {
       console.error('❌ Error fetching soil data:', error);
@@ -244,7 +248,7 @@ const Recommendation = () => {
 
       toast({
         title: "Soil Health Card Processed!",
-        description: "Your soil data has been successfully loaded",
+        description: "Data extracted from your uploaded card",
         variant: "default"
       });
 
@@ -602,23 +606,46 @@ const Recommendation = () => {
                     <MapPin className="h-6 w-6 text-earth" />
                     <span>Soil Analysis Data</span>
                   </div>
-                  {!soilHealthData && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={fetchSoilData}
-                      disabled={isLoadingSoilData || isLoading}
-                      className="ml-auto"
-                    >
-                      {isLoadingSoilData ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <MapPin className="h-4 w-4 mr-2" />
-                      )}
-                      {isLoadingSoilData ? "Loading..." : "Get Soil Data"}
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {soilHealthData && (
+                      <div className="flex items-center gap-2">
+                        {soilHealthData.dataSource === 'soilgrids-api' && (
+                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                            <Database className="h-3.5 w-3.5" />
+                            <span>Real-time API</span>
+                          </div>
+                        )}
+                        {soilHealthData.dataSource === 'mock-regional' && (
+                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
+                            <CloudCog className="h-3.5 w-3.5" />
+                            <span>Sample Data</span>
+                          </div>
+                        )}
+                        {soilHealthData.dataSource === 'soil-health-card' && (
+                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent text-accent-foreground text-xs font-medium">
+                            <FileText className="h-3.5 w-3.5" />
+                            <span>From SHC</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {!soilHealthData && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={fetchSoilData}
+                        disabled={isLoadingSoilData || isLoading}
+                      >
+                        {isLoadingSoilData ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <MapPin className="h-4 w-4 mr-2" />
+                        )}
+                        {isLoadingSoilData ? "Loading..." : "Get Soil Data"}
+                      </Button>
+                    )}
+                  </div>
                 </CardTitle>
                 {soilHealthData && (
                   <div className="text-sm text-muted-foreground animate-in slide-in-from-top-2 duration-500">

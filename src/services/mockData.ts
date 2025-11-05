@@ -19,6 +19,7 @@ export const mockSoilData: Record<string, SoilHealthData> = {
       latitude: 28.6139,
       longitude: 77.2090
     },
-    lastUpdated: new Date()
+    lastUpdated: new Date(),
+    dataSource: 'mock-regional'
   }
 };
