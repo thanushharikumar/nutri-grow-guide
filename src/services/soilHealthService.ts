@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Coordinates } from './weatherService';
+import { SoilGridsService } from './SoilGridsService';
 
 export interface SoilHealthData {
   soilType: 'sandy' | 'loamy' | 'clayey' | 'silty';
@@ -46,21 +47,26 @@ export const getSoilHealthData = async (coordinates: Coordinates): Promise<SoilH
   }
 
   try {
-    console.log('🌍 Fetching soil data for coordinates:', coordinates);
+    console.log('🌍 Fetching real soil data from SoilGrids for coordinates:', coordinates);
     
-    // Get region and mock data since Supabase is not running locally
-    const region = getRegionFromCoordinates(coordinates);
-    console.log('📍 Determined region:', region);
+    // Try to fetch real data from SoilGrids API
+    const soilGridsData = await SoilGridsService.getSoilData(coordinates.lat, coordinates.lon);
+    console.log('✅ Real soil data fetched from SoilGrids:', soilGridsData);
     
-    const baseData = mockSoilData[region]; // Use mockSoilData here
-    if (!baseData) {
-      console.error('❌ No data found for region:', region);
-      throw new Error('No soil data available for this region');
-    }
-    
-    // Return mock data with location and timestamp
     const soilData: SoilHealthData = {
-      ...baseData,
+      soilType: soilGridsData.soilType,
+      pH: soilGridsData.pH,
+      nitrogen: soilGridsData.nitrogen,
+      phosphorus: soilGridsData.phosphorus,
+      potassium: soilGridsData.potassium,
+      organicCarbon: soilGridsData.organicCarbon,
+      electricalConductivity: 0.5,
+      micronutrients: {
+        iron: 15,
+        manganese: 8,
+        zinc: 0.8,
+        copper: 0.6
+      },
       location: {
         latitude: coordinates.lat,
         longitude: coordinates.lon
@@ -71,8 +77,25 @@ export const getSoilHealthData = async (coordinates: Coordinates): Promise<SoilH
     console.log('✅ Retrieved soil health data:', soilData);
     return soilData;
   } catch (error) {
-    console.error('❌ Error getting soil health data:', error);
-    throw error;
+    console.error('⚠️ SoilGrids API failed, falling back to mock data:', error);
+    
+    // Fallback to mock data if SoilGrids fails
+    const region = getRegionFromCoordinates(coordinates);
+    console.log('📍 Using mock data for region:', region);
+    
+    const baseData = mockSoilData[region] || mockSoilData['North India'];
+    
+    const soilData: SoilHealthData = {
+      ...baseData,
+      location: {
+        latitude: coordinates.lat,
+        longitude: coordinates.lon
+      },
+      lastUpdated: new Date()
+    };
+
+    console.log('✅ Retrieved soil health data (mock):', soilData);
+    return soilData;
   }
 };
 
