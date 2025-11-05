@@ -21,6 +21,7 @@ export interface SoilHealthData {
     longitude: number;
   };
   lastUpdated: Date;
+  dataSource: 'soilgrids-api' | 'mock-regional' | 'soil-health-card';
 }
 
 // Import mock data from separate file
@@ -71,7 +72,8 @@ export const getSoilHealthData = async (coordinates: Coordinates): Promise<SoilH
         latitude: coordinates.lat,
         longitude: coordinates.lon
       },
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
+      dataSource: 'soilgrids-api'
     };
 
     console.log('✅ Retrieved soil health data:', soilData);
@@ -91,7 +93,8 @@ export const getSoilHealthData = async (coordinates: Coordinates): Promise<SoilH
         latitude: coordinates.lat,
         longitude: coordinates.lon
       },
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
+      dataSource: 'mock-regional'
     };
 
     console.log('✅ Retrieved soil health data (mock):', soilData);
@@ -198,7 +201,8 @@ export const uploadSoilHealthCard = async (file: File): Promise<SoilHealthData> 
         latitude,
         longitude
       },
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
+      dataSource: 'soil-health-card'
     };
 
     // Warn if confidence is low
