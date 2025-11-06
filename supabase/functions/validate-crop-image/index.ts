@@ -58,6 +58,36 @@ serve(async (req) => {
     const data = await visionResponse.json();
     console.log("Vision API response:", JSON.stringify(data, null, 2));
 
+    // Check for API errors (billing not enabled, etc.)
+    if (data.error || data.responses?.[0]?.error) {
+      const errorMsg = data.error?.message || data.responses?.[0]?.error?.message;
+      console.warn("Vision API error:", errorMsg);
+      
+      // If API has billing issues, allow image and let client-side analysis handle it
+      if (errorMsg?.includes('billing') || errorMsg?.includes('BILLING')) {
+        console.log("Billing issue detected - allowing image to proceed with client-side analysis");
+        return new Response(
+          JSON.stringify({
+            valid: true,
+            message: "Proceeding with local analysis (Vision API unavailable)",
+            usedFallback: true
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+      
+      // For other API errors, return error
+      return new Response(
+        JSON.stringify({ valid: false, message: "Image validation service error" }),
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
     const labels =
       data.responses?.[0]?.labelAnnotations?.map((l) =>
         l.description.toLowerCase()
