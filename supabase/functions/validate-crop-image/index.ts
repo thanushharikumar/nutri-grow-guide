@@ -54,11 +54,48 @@ serve(async (req) => {
       }
     );
 
-    const data = await kindwiseResponse.json();
-    console.log("Kindwise API response:", JSON.stringify(data, null, 2));
+    console.log("Kindwise API status:", kindwiseResponse.status);
 
-    // Check for API errors
-    if (!kindwiseResponse.ok || data.error) {
+    // Check response status first
+    if (!kindwiseResponse.ok) {
+      const errorText = await kindwiseResponse.text();
+      console.error("Kindwise API error response:", errorText);
+      
+      return new Response(
+        JSON.stringify({ 
+          valid: false, 
+          message: "Image validation service error. Please check API key configuration." 
+        }),
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
+    // Try to parse JSON response
+    let data;
+    try {
+      data = await kindwiseResponse.json();
+      console.log("Kindwise API response:", JSON.stringify(data, null, 2));
+    } catch (parseError) {
+      const responseText = await kindwiseResponse.text();
+      console.error("Failed to parse Kindwise response as JSON:", responseText);
+      
+      return new Response(
+        JSON.stringify({ 
+          valid: false, 
+          message: "Invalid response from image validation service" 
+        }),
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
+    // Check for API errors in response data
+    if (data.error) {
       const errorMsg = data.error?.message || data.message || "Unknown error";
       console.warn("Kindwise API error:", errorMsg);
       
