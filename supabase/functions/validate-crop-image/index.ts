@@ -49,7 +49,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           images: [image],
-          similar_images: false,
+          similar_images: true,
         }),
       }
     );
