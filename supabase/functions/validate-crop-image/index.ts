@@ -108,6 +108,24 @@ serve(async (req) => {
       );
     }
 
+    // First check if it's recognized as a plant at all
+    const isPlant = data.result?.is_plant;
+    console.log("Is plant check:", isPlant);
+
+    if (!isPlant || !isPlant.binary) {
+      console.log("Image validation failed - not recognized as a plant");
+      return new Response(
+        JSON.stringify({
+          valid: false,
+          message: `This doesn't appear to be a plant image (${Math.round((isPlant?.probability || 0) * 100)}% confidence). Please upload a clear photo of a crop or plant.`,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     // Check if the API identified any crop
     const cropSuggestions = data.result?.crop?.suggestions || [];
     console.log("Crop suggestions:", cropSuggestions);
@@ -115,12 +133,12 @@ serve(async (req) => {
     // Validate if it's a crop image - check if top suggestion has reasonable probability
     const topCropSuggestion = cropSuggestions[0];
     
-    if (!topCropSuggestion || topCropSuggestion.probability < 0.3) {
+    if (!topCropSuggestion || topCropSuggestion.probability < 0.15) {
       console.log("Image validation failed - not a crop image or low confidence");
       return new Response(
         JSON.stringify({
           valid: false,
-          message: "Invalid image detected. Please upload a clear crop or plant image.",
+          message: "Unable to identify a specific crop. Please upload a clearer image showing the plant more prominently.",
           suggestions: cropSuggestions.slice(0, 3),
         }),
         {
