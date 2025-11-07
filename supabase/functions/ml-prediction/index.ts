@@ -1,10 +1,25 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+// Input validation schema
+const PredictionRequestSchema = z.object({
+  N: z.number().min(0).max(1000),
+  P: z.number().min(0).max(200),
+  K: z.number().min(0).max(500),
+  pH: z.number().min(0).max(14),
+  organicCarbon: z.number().min(0).max(10),
+  cropType: z.string().min(1).max(100),
+  soilType: z.enum(['sandy', 'loamy', 'clayey', 'silty', 'black', 'red', 'laterite']),
+  temperature: z.number().min(-50).max(60).optional(),
+  rainfall: z.number().min(0).max(500).optional(),
+  humidity: z.number().min(0).max(100).optional()
+});
 
 interface PredictionRequest {
   N: number
@@ -128,13 +143,26 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     )
 
-    const requestData: PredictionRequest = await req.json()
-    console.log('ML Prediction request:', requestData)
-
-    // Validate input data
-    if (!requestData.N || !requestData.P || !requestData.K || !requestData.pH) {
-      throw new Error('Missing required soil parameters')
+    // Parse and validate input
+    const body = await req.json();
+    const validationResult = PredictionRequestSchema.safeParse(body);
+    
+    if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error.errors);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input', 
+          details: validationResult.error.errors 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
+
+    const requestData: PredictionRequest = validationResult.data;
+    console.log('ML Prediction request:', requestData);
 
     // Get ML prediction
     const prediction = predictFertilizer(requestData)

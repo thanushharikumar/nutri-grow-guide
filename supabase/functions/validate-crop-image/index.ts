@@ -1,9 +1,18 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Input validation schema - max 10MB base64 image
+const ImageRequestSchema = z.object({
+  image: z.string()
+    .min(100, "Image data is too short")
+    .max(13981016, "Image size exceeds 10MB limit")
+    .regex(/^data:image\/(jpeg|jpg|png|webp);base64,/, "Invalid image format")
+});
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -12,11 +21,17 @@ serve(async (req) => {
   }
 
   try {
-    const { image } = await req.json();
+    // Parse and validate input
+    const body = await req.json();
+    const validationResult = ImageRequestSchema.safeParse(body);
     
-    if (!image) {
+    if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error.errors);
       return new Response(
-        JSON.stringify({ valid: false, message: "No image provided" }),
+        JSON.stringify({ 
+          valid: false,
+          message: validationResult.error.errors[0]?.message || 'Invalid image data'
+        }),
         { 
           status: 400, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 
@@ -24,12 +39,14 @@ serve(async (req) => {
       );
     }
 
-    const apiKey = Deno.env.get("GOOGLE_VISION_API_KEY");
+    const { image } = validationResult.data;
+
+    const apiKey = Deno.env.get("KINDWISE_API_KEY");
     
     if (!apiKey) {
-      console.error("GOOGLE_VISION_API_KEY not found");
+      console.error("KINDWISE_API_KEY not found");
       return new Response(
-        JSON.stringify({ valid: false, message: "Vision API not configured" }),
+        JSON.stringify({ valid: false, message: "Crop validation API not configured" }),
         { 
           status: 500, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 
@@ -37,60 +54,87 @@ serve(async (req) => {
       );
     }
 
-    console.log("Calling Vision API for image validation...");
+    console.log("Calling Kindwise Crop.health API for image validation...");
 
-    const visionResponse = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+    const kindwiseResponse = await fetch(
+      "https://crop.kindwise.com/api/v1/identification",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Api-Key": apiKey
+        },
         body: JSON.stringify({
-          requests: [
-            {
-              image: { content: image },
-              features: [{ type: "LABEL_DETECTION", maxResults: 10 }],
-            },
-          ],
+          images: [image],
+          similar_images: true,
         }),
       }
     );
 
-    const data = await visionResponse.json();
-    console.log("Vision API response:", JSON.stringify(data, null, 2));
+    console.log("Kindwise API status:", kindwiseResponse.status);
 
-    const labels =
-      data.responses?.[0]?.labelAnnotations?.map((l) =>
-        l.description.toLowerCase()
-      ) || [];
+    // Check response status first
+    if (!kindwiseResponse.ok) {
+      const errorText = await kindwiseResponse.text();
+      console.error("Kindwise API error response:", errorText);
+      
+      return new Response(
+        JSON.stringify({ 
+          valid: false, 
+          message: "Image validation service error. Please check API key configuration." 
+        }),
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
 
-    console.log("Detected labels:", labels);
+    // Try to parse JSON response
+    let data;
+    try {
+      data = await kindwiseResponse.json();
+      console.log("Kindwise API response:", JSON.stringify(data, null, 2));
+    } catch (parseError) {
+      const responseText = await kindwiseResponse.text();
+      console.error("Failed to parse Kindwise response as JSON:", responseText);
+      
+      return new Response(
+        JSON.stringify({ 
+          valid: false, 
+          message: "Invalid response from image validation service" 
+        }),
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
 
-    const plantKeywords = [
-      "plant",
-      "leaf",
-      "crop",
-      "wheat",
-      "maize",
-      "rice",
-      "vegetation",
-      "field",
-      "agriculture",
-      "farming",
-      "green",
-    ];
+    // Check for API errors in response data
+    if (data.error) {
+      const errorMsg = data.error?.message || data.message || "Unknown error";
+      console.warn("Kindwise API error:", errorMsg);
+      
+      return new Response(
+        JSON.stringify({ valid: false, message: "Image validation service error" }),
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
 
-    const isCrop = labels.some((label) =>
-      plantKeywords.some((keyword) => label.includes(keyword))
-    );
+    // First check if it's recognized as a plant at all
+    const isPlant = data.result?.is_plant;
+    console.log("Is plant check:", isPlant);
 
-    if (!isCrop) {
-      console.log("Image validation failed - not a crop image");
+    if (!isPlant || !isPlant.binary) {
+      console.log("Image validation failed - not recognized as a plant");
       return new Response(
         JSON.stringify({
           valid: false,
-          message:
-            "Invalid image detected. Please upload a crop or plant image.",
-          labels: labels,
+          message: `This doesn't appear to be a plant image (${Math.round((isPlant?.probability || 0) * 100)}% confidence). Please upload a clear photo of a crop or plant.`,
         }),
         {
           status: 400,
@@ -99,13 +143,37 @@ serve(async (req) => {
       );
     }
 
-    console.log("Image validated successfully as crop image");
+    // Check if the API identified any crop
+    const cropSuggestions = data.result?.crop?.suggestions || [];
+    console.log("Crop suggestions:", cropSuggestions);
+
+    // Validate if it's a crop image - check if top suggestion has reasonable probability
+    const topCropSuggestion = cropSuggestions[0];
+    
+    if (!topCropSuggestion || topCropSuggestion.probability < 0.15) {
+      console.log("Image validation failed - not a crop image or low confidence");
+      return new Response(
+        JSON.stringify({
+          valid: false,
+          message: "Unable to identify a specific crop. Please upload a clearer image showing the plant more prominently.",
+          suggestions: cropSuggestions.slice(0, 3),
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.log("Image validated successfully as crop image:", topCropSuggestion.name);
 
     return new Response(
       JSON.stringify({
         valid: true,
-        confidence: 0.95,
-        labels: labels,
+        confidence: topCropSuggestion.probability,
+        crop: topCropSuggestion.name,
+        scientificName: topCropSuggestion.scientific_name,
+        suggestions: cropSuggestions.slice(0, 3),
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
