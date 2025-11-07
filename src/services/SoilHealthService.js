@@ -1,6 +1,5 @@
 // SoilHealthService.js
-export class SoilHealthService {
-  static async getSoilHealthData(coordinates) {
+export const getSoilHealthData = async (coordinates) => {
     try {
       console.log('Fetching soil data for coordinates:', coordinates);
       
@@ -20,5 +19,27 @@ export class SoilHealthService {
       console.error("Error fetching soil health data:", error);
       throw new Error("Unable to connect to soil health database");
     }
-  }
+};
+export interface SoilHealthData {
+  soilType: string;
+  pH: number;
+  nitrogen: number;
+  phosphorus: number;
+  potassium: number;
+  organicCarbon: number;
+  cardNumber: string;
 }
+
+export const uploadSoilHealthCard = async (file: File): Promise<{ success: boolean; message: string }> => {
+  try {
+    console.log('Uploading soil health card:', file);
+    // Mock upload implementation
+    return {
+      success: true,
+      message: "Soil health card uploaded successfully"
+    };
+  } catch (error) {
+    console.error("Error uploading soil health card:", error);
+    throw new Error("Unable to upload soil health card");
+  }
+};
