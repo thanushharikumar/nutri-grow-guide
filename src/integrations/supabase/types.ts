@@ -136,6 +136,27 @@ export type Database = {
         }
         Relationships: []
       }
+      image_analysis_cache: {
+        Row: {
+          created_at: string | null
+          id: string
+          image_hash: string
+          vision_result: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          image_hash: string
+          vision_result?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          image_hash?: string
+          vision_result?: Json | null
+        }
+        Relationships: []
+      }
       ml_predictions: {
         Row: {
           confidence: number | null

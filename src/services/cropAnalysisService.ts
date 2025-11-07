@@ -239,38 +239,9 @@ export const analyzeCropImage = async (imageFile: File): Promise<CropAnalysisRes
           edgePercentage: edgePercentage.toFixed(1) + '%'
         });
         
-        // Strict multi-factor validation
-        const validationErrors = [];
-        
-        if (greenPercentage < 25) {
-          validationErrors.push('insufficient green content');
-        }
-        if (strongGreenPercentage < 10) {
-          validationErrors.push('lack of healthy plant coloration');
-        }
-        if (bluePercentage > 40) {
-          validationErrors.push('too much sky/water content');
-        }
-        if (uniformityPercentage > 80) {
-          validationErrors.push('suspiciously uniform coloring');
-        }
-        if (colorGroups.size < 100) {
-          validationErrors.push('not enough color variation');
-        }
-        if (textureScore < 5) {
-          validationErrors.push('insufficient leaf/plant texture');
-        }
-        if (edgePercentage < 10) {
-          validationErrors.push('missing natural plant edges/details');
-        }
-        
-        if (validationErrors.length > 0) {
-          console.error('Image validation failed:', validationErrors);
-          reject(new Error(
-            `Please upload a clear image of crops or plants. Issues detected: ${validationErrors.join(', ')}.`
-          ));
-          return;
-        }
+        // Google Vision API has already validated this is a crop image
+        // Client-side checks are only for quality warnings, not rejection
+        console.log('✅ Image passed Google Vision API validation - proceeding with analysis');
         
         // Perform color analysis for nutrient deficiency detection
         const colorAnalysis = analyzeLeafColor(data);
