@@ -1,10 +1,25 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Input validation schema
+const RecommendationRequestSchema = z.object({
+  cropType: z.string().min(1).max(100),
+  soilType: z.enum(['sandy', 'loamy', 'clayey', 'silty', 'black', 'red', 'laterite']),
+  pH: z.number().min(0).max(14),
+  nitrogen: z.number().min(0).max(1000),
+  phosphorus: z.number().min(0).max(200),
+  potassium: z.number().min(0).max(500),
+  organicCarbon: z.number().min(0).max(10),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  imageBase64: z.string().nullable().optional()
+});
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -30,7 +45,25 @@ async function getFertilizerRecommendation(req: Request) {
   }
 
   try {
-    const reqData = await req.json() as RecommendationRequest;
+    // Parse and validate input
+    const body = await req.json();
+    const validationResult = RecommendationRequestSchema.safeParse(body);
+    
+    if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error.errors);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input', 
+          details: validationResult.error.errors 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    const reqData = validationResult.data as RecommendationRequest;
     console.log('Processing recommendation for crop:', reqData.cropType);
 
     // Get weather data if coordinates provided

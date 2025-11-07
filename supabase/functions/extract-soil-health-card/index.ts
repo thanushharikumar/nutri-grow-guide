@@ -1,9 +1,18 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Input validation schema - max 10MB base64 image
+const SoilCardImageSchema = z.object({
+  image: z.string()
+    .min(100, "Image data is too short")
+    .max(13981016, "Image size exceeds 10MB limit")
+    .regex(/^data:image\/(jpeg|jpg|png|pdf);base64,/, "Invalid format")
+});
 
 interface ExtractedSoilData {
   nitrogen: number | null;
@@ -23,17 +32,24 @@ serve(async (req) => {
   }
 
   try {
-    const { image } = await req.json();
+    // Parse and validate input
+    const body = await req.json();
+    const validationResult = SoilCardImageSchema.safeParse(body);
     
-    if (!image) {
+    if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error.errors);
       return new Response(
-        JSON.stringify({ error: "No image provided" }),
+        JSON.stringify({ 
+          error: validationResult.error.errors[0]?.message || 'Invalid image data'
+        }),
         { 
           status: 400, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
       );
     }
+
+    const { image } = validationResult.data;
 
     const apiKey = Deno.env.get("GOOGLE_VISION_API_KEY");
     

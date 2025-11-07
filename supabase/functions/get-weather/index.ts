@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,12 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 );
+
+// Input validation schema
+const WeatherRequestSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180)
+});
 
 interface WeatherRequest {
   lat: number;
@@ -31,7 +38,25 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { lat, lon }: WeatherRequest = await req.json();
+    // Parse and validate input
+    const body = await req.json();
+    const validationResult = WeatherRequestSchema.safeParse(body);
+    
+    if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error.errors);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input', 
+          details: validationResult.error.errors 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    const { lat, lon }: WeatherRequest = validationResult.data;
     const apiKey = Deno.env.get('OPENWEATHER_API_KEY');
 
     if (!apiKey) {
