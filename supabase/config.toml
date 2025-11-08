@@ -1,19 +1,19 @@
 project_id = "bkqzrfuyjugegxcqxwuo"
 
 [functions.get-weather]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-recommendation] 
-verify_jwt = false
+verify_jwt = true
 
 [functions.ml-prediction]
-verify_jwt = false
+verify_jwt = true
 
 [functions.getFertilizerRecommendation]
-verify_jwt = false
+verify_jwt = true
 
 [functions.validate-crop-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.extract-soil-health-card]
-verify_jwt = false
+verify_jwt = true
