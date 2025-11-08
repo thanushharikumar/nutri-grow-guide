@@ -24,6 +24,7 @@ export type Database = {
           id: string
           image_url: string | null
           recommendations: string[]
+          user_id: string | null
         }
         Insert: {
           analysis_date?: string
@@ -34,6 +35,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           recommendations?: string[]
+          user_id?: string | null
         }
         Update: {
           analysis_date?: string
@@ -44,6 +46,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           recommendations?: string[]
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -62,6 +65,7 @@ export type Database = {
           products: Json
           soil_data: Json
           sustainability_score: number
+          user_id: string | null
           weather_considerations: string[]
           weather_data: Json
         }
@@ -79,6 +83,7 @@ export type Database = {
           products?: Json
           soil_data: Json
           sustainability_score: number
+          user_id?: string | null
           weather_considerations?: string[]
           weather_data: Json
         }
@@ -96,6 +101,7 @@ export type Database = {
           products?: Json
           soil_data?: Json
           sustainability_score?: number
+          user_id?: string | null
           weather_considerations?: string[]
           weather_data?: Json
         }
@@ -165,6 +171,7 @@ export type Database = {
           input_data: Json
           model_version: string
           prediction_result: Json
+          user_id: string | null
         }
         Insert: {
           confidence?: number | null
@@ -173,6 +180,7 @@ export type Database = {
           input_data: Json
           model_version?: string
           prediction_result: Json
+          user_id?: string | null
         }
         Update: {
           confidence?: number | null
@@ -181,6 +189,31 @@ export type Database = {
           input_data?: Json
           model_version?: string
           prediction_result?: Json
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -195,6 +228,7 @@ export type Database = {
           p: number | null
           ph: number | null
           ts: string | null
+          user_id: string | null
         }
         Insert: {
           crop?: string | null
@@ -206,6 +240,7 @@ export type Database = {
           p?: number | null
           ph?: number | null
           ts?: string | null
+          user_id?: string | null
         }
         Update: {
           crop?: string | null
@@ -217,6 +252,7 @@ export type Database = {
           p?: number | null
           ph?: number | null
           ts?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -235,6 +271,7 @@ export type Database = {
           potassium: number
           region: string
           soil_type: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -250,6 +287,7 @@ export type Database = {
           potassium?: number
           region: string
           soil_type: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -265,6 +303,7 @@ export type Database = {
           potassium?: number
           region?: string
           soil_type?: string
+          user_id?: string | null
         }
         Relationships: []
       }
