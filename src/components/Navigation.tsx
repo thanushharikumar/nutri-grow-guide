@@ -1,8 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
-import { Leaf, ChartBar, Info } from "lucide-react";
+import { Leaf, ChartBar, Info, LogOut, LogIn } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 
 const Navigation = () => {
   const location = useLocation();
+  const { user, signOut } = useAuth();
   
   const isActive = (path: string) => location.pathname === path;
   
@@ -37,17 +40,19 @@ const Navigation = () => {
               <span className="font-medium">Home</span>
             </Link>
             
-            <Link
-              to="/recommendation"
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-                isActive("/recommendation")
-                  ? "bg-gradient-primary text-primary-foreground shadow-soft"
-                  : "text-foreground hover:bg-accent hover:text-accent-foreground"
-              }`}
-            >
-              <ChartBar className="h-4 w-4" />
-              <span className="font-medium">Get Recommendation</span>
-            </Link>
+            {user && (
+              <Link
+                to="/recommendation"
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                  isActive("/recommendation")
+                    ? "bg-gradient-primary text-primary-foreground shadow-soft"
+                    : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                }`}
+              >
+                <ChartBar className="h-4 w-4" />
+                <span className="font-medium">Get Recommendation</span>
+              </Link>
+            )}
             
             <Link
               to="/about"
@@ -60,6 +65,25 @@ const Navigation = () => {
               <Info className="h-4 w-4" />
               <span className="font-medium">About</span>
             </Link>
+
+            {user ? (
+              <Button
+                onClick={signOut}
+                variant="outline"
+                size="sm"
+                className="ml-2"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            ) : (
+              <Link to="/auth">
+                <Button variant="outline" size="sm" className="ml-2">
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Sign In
+                </Button>
+              </Link>
+            )}
           </div>
           
           {/* Mobile menu button */}
