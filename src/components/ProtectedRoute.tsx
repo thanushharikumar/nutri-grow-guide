@@ -1,17 +1,13 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-}
-
-export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-pulse">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg text-muted-foreground">Loading...</div>
       </div>
     );
   }
@@ -22,3 +18,5 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   return <>{children}</>;
 };
+
+export default ProtectedRoute;

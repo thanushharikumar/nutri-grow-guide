@@ -1,200 +1,174 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
 import { Leaf } from 'lucide-react';
 import { z } from 'zod';
 
-const emailSchema = z.string().email('Invalid email address').max(255);
-const passwordSchema = z.string().min(6, 'Password must be at least 6 characters').max(72);
-const nameSchema = z.string().trim().min(1, 'Name is required').max(100);
+const emailSchema = z.string().email('Invalid email address');
+const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
+const nameSchema = z.string().min(2, 'Name must be at least 2 characters');
 
 const Auth = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [signUpData, setSignUpData] = useState({ email: '', password: '', fullName: '' });
-  const [signInData, setSignInData] = useState({ email: '', password: '' });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const { user, signUp, signIn } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
+  const [loading, setLoading] = useState(false);
+  const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already logged in
-  useEffect(() => {
-    if (user) {
-      navigate('/', { replace: true });
-    }
-  }, [user, navigate]);
+  if (user) {
+    navigate('/recommendation');
+    return null;
+  }
 
-  const validateSignUp = () => {
-    const newErrors: Record<string, string> = {};
+  const validateForm = () => {
+    const newErrors: { email?: string; password?: string; fullName?: string } = {};
     
     try {
-      emailSchema.parse(signUpData.email);
-    } catch (e: any) {
-      newErrors.email = e.errors[0]?.message || 'Invalid email';
+      emailSchema.parse(email);
+    } catch (e) {
+      newErrors.email = 'Invalid email address';
     }
 
     try {
-      passwordSchema.parse(signUpData.password);
-    } catch (e: any) {
-      newErrors.password = e.errors[0]?.message || 'Invalid password';
+      passwordSchema.parse(password);
+    } catch (e) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
 
-    try {
-      nameSchema.parse(signUpData.fullName);
-    } catch (e: any) {
-      newErrors.fullName = e.errors[0]?.message || 'Invalid name';
+    if (isSignUp) {
+      try {
+        nameSchema.parse(fullName);
+      } catch (e) {
+        newErrors.fullName = 'Name must be at least 2 characters';
+      }
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const validateSignIn = () => {
-    const newErrors: Record<string, string> = {};
-    
-    try {
-      emailSchema.parse(signInData.email);
-    } catch (e: any) {
-      newErrors.email = e.errors[0]?.message || 'Invalid email';
-    }
-
-    try {
-      passwordSchema.parse(signInData.password);
-    } catch (e: any) {
-      newErrors.password = e.errors[0]?.message || 'Invalid password';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateSignUp()) return;
-
-    setIsLoading(true);
-    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
-    setIsLoading(false);
-
-    if (!error) {
-      setSignUpData({ email: '', password: '', fullName: '' });
+    if (!validateForm()) {
+      return;
     }
-  };
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateSignIn()) return;
-
-    setIsLoading(true);
-    const { error } = await signIn(signInData.email, signInData.password);
-    setIsLoading(false);
-
-    if (!error) {
-      navigate('/', { replace: true });
+    setLoading(true);
+    try {
+      if (isSignUp) {
+        await signUp(email, password, fullName);
+      } else {
+        await signIn(email, password);
+      }
+    } catch (error) {
+      // Error handling is done in the auth hook
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-subtle px-4 py-12">
       <Card className="w-full max-w-md shadow-strong">
-        <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto p-3 bg-gradient-primary rounded-lg shadow-soft w-fit">
-            <Leaf className="h-8 w-8 text-primary-foreground" />
+        <CardHeader className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="p-3 bg-gradient-primary rounded-lg shadow-soft">
+              <Leaf className="h-8 w-8 text-primary-foreground" />
+            </div>
           </div>
-          <div>
-            <CardTitle className="text-2xl">Welcome</CardTitle>
-            <CardDescription>Sign in or create an account to continue</CardDescription>
-          </div>
+          <CardTitle className="text-2xl font-bold">
+            {isSignUp ? 'Create Account' : 'Welcome Back'}
+          </CardTitle>
+          <CardDescription>
+            {isSignUp
+              ? 'Sign up to start optimizing your fertilizer usage'
+              : 'Sign in to access your recommendations'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signin-email">Email</Label>
-                  <Input
-                    id="signin-email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={signInData.email}
-                    onChange={(e) => setSignInData({ ...signInData, email: e.target.value })}
-                    required
-                  />
-                  {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signin-password">Password</Label>
-                  <Input
-                    id="signin-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={signInData.password}
-                    onChange={(e) => setSignInData({ ...signInData, password: e.target.value })}
-                    required
-                  />
-                  {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
-                </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Signing in...' : 'Sign In'}
-                </Button>
-              </form>
-            </TabsContent>
-            
-            <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-name">Full Name</Label>
-                  <Input
-                    id="signup-name"
-                    type="text"
-                    placeholder="John Doe"
-                    value={signUpData.fullName}
-                    onChange={(e) => setSignUpData({ ...signUpData, fullName: e.target.value })}
-                    required
-                  />
-                  {errors.fullName && <p className="text-sm text-destructive">{errors.fullName}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={signUpData.email}
-                    onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
-                    required
-                  />
-                  {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={signUpData.password}
-                    onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
-                    required
-                  />
-                  {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
-                </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Creating account...' : 'Sign Up'}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  placeholder="John Farmer"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  className={errors.fullName ? 'border-destructive' : ''}
+                />
+                {errors.fullName && (
+                  <p className="text-sm text-destructive">{errors.fullName}</p>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="farmer@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className={errors.email ? 'border-destructive' : ''}
+              />
+              {errors.email && (
+                <p className="text-sm text-destructive">{errors.email}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className={errors.password ? 'border-destructive' : ''}
+              />
+              {errors.password && (
+                <p className="text-sm text-destructive">{errors.password}</p>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-gradient-primary text-primary-foreground shadow-glow hover:shadow-strong"
+              disabled={loading}
+            >
+              {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setErrors({});
+              }}
+              className="text-sm text-primary hover:underline"
+            >
+              {isSignUp
+                ? 'Already have an account? Sign in'
+                : "Don't have an account? Sign up"}
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>
