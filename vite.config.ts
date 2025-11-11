@@ -5,7 +5,7 @@ import path from "path";
 export default defineConfig(({ mode }) => ({
   server: {
     host: true,
-    port: 54321,
+    port: 8080,
     strictPort: true,
     proxy: {
       '/functions': {
