@@ -1,10 +1,11 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Leaf, ChartBar, Info, LogOut, LogIn } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 
 const Navigation = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, signOut } = useAuth();
   
   const isActive = (path: string) => location.pathname === path;
@@ -91,11 +92,12 @@ const Navigation = () => {
             <select
               className="bg-background border border-border rounded-lg px-3 py-2 text-sm"
               value={location.pathname}
-              onChange={(e) => window.location.href = e.target.value}
+              onChange={(e) => navigate(e.target.value)}
             >
               <option value="/">Home</option>
-              <option value="/recommendation">Get Recommendation</option>
+              {user && <option value="/recommendation">Get Recommendation</option>}
               <option value="/about">About</option>
+              {!user && <option value="/auth">Sign In</option>}
             </select>
           </div>
         </div>
