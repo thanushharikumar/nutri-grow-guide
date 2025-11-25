@@ -80,10 +80,16 @@ const validateCropImage = async (imageFile: File): Promise<boolean> => {
   return new Promise((resolve, reject) => {
     reader.onload = async () => {
       try {
-        const base64 = (reader.result as string).split(',')[1];
-        
+        // Edge Function expects full data URI (data:image/...;base64,...)
+        const dataUri = reader.result as string;
+
+        if (!dataUri || !dataUri.startsWith('data:image/')) {
+          reject(new Error('Invalid image format'));
+          return;
+        }
+
         const response = await supabase.functions.invoke('validate-crop-image', {
-          body: { image: base64 }
+          body: { image: dataUri }
         });
 
         if (response.error) {

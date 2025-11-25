@@ -225,13 +225,15 @@ async function getFertilizerRecommendation(req: Request) {
     sustainabilityScore += Math.max(-15, -((finalRecommendation.nitrogen + finalRecommendation.phosphorus + finalRecommendation.potassium) / 20));
     sustainabilityScore = Math.min(100, Math.max(0, Math.round(sustainabilityScore)));
 
-    const expectedYieldIncrease = Math.round(5 + (sustainabilityScore - 50) * 0.3);
+    // Calculate cost per hectare using nutrient prices
     const costEstimate = Math.round(
-      (finalRecommendation.nitrogen * 0.8) + 
-      (finalRecommendation.phosphorus * 1.2) + 
-      (finalRecommendation.potassium * 0.6) +
-      (soilData.organicCarbon < 1.0 ? 50 : 0)
+      (finalRecommendation.nitrogen * 80) +      // ₹80 per kg of N
+      (finalRecommendation.phosphorus * 140) +   // ₹140 per kg of P2O5
+      (finalRecommendation.potassium * 62) +    // ₹62 per kg of K2O
+      (soilData.organicCarbon < 1.0 ? 500 : 0)    // ₹500 per hectare if OC < 1%
     );
+
+    const expectedYieldIncrease = Math.round(5 + (sustainabilityScore - 50) * 0.3);
 
     const result = {
       fertilizer: finalRecommendation,

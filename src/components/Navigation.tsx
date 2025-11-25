@@ -1,7 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Leaf, ChartBar, Info, LogOut, LogIn } from "lucide-react";
+import { ChartBar, Info, LogOut, LogIn } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import leafLogo from "@/assets/leaf-logo.svg";
 
 const Navigation = () => {
   const location = useLocation();
@@ -14,19 +15,20 @@ const Navigation = () => {
     <nav className="bg-background/95 backdrop-blur-sm border-b border-border shadow-soft sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-2">
-            <div className="p-2 bg-gradient-primary rounded-lg shadow-soft">
-              <Leaf className="h-6 w-6 text-primary-foreground" />
+          <Link to="/" className="flex items-center space-x-3">
+            <div className="relative h-10 w-10 rounded-2xl bg-primary/10 shadow-glow ring-1 ring-primary/30">
+              <img
+                src={leafLogo}
+                alt="Sustainable Fertilizer logo"
+                className="h-full w-full p-1.5"
+                loading="eager"
+              />
             </div>
-            <div>
-              <h1 className="font-bold text-lg text-foreground">
-                Sustainable Fertilizer
-              </h1>
-              <p className="text-sm text-muted-foreground -mt-1">
-                Usage Optimizer
-              </p>
+            <div className="hidden sm:block">
+              <p className="text-sm uppercase tracking-wider text-muted-foreground">Sustainable</p>
+              <p className="text-base font-semibold text-foreground leading-tight">Fertilizer Guide</p>
             </div>
-          </div>
+          </Link>
           
           <div className="hidden md:flex items-center space-x-1">
             <Link
@@ -37,7 +39,6 @@ const Navigation = () => {
                   : "text-foreground hover:bg-accent hover:text-accent-foreground"
               }`}
             >
-              <Leaf className="h-4 w-4" />
               <span className="font-medium">Home</span>
             </Link>
             

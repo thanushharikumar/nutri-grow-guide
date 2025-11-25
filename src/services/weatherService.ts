@@ -26,22 +26,41 @@ export function getUserLocation(): Promise<Coordinates> {
       return;
     }
 
+    // First try with low accuracy for faster response
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        console.log("✅ Location detected:", position.coords);
+        console.log("✅ Fast location detected:", position.coords);
         resolve({
           lat: position.coords.latitude,
           lon: position.coords.longitude
         });
       },
       (error) => {
-        console.error("❌ Location error:", error.message);
-        reject(new Error("Location permission denied or unavailable."));
+        console.warn("Fast location failed, trying high accuracy:", error.code);
+        // If fast location fails, try high accuracy as fallback
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            console.log("✅ High accuracy location detected:", position.coords);
+            resolve({
+              lat: position.coords.latitude,
+              lon: position.coords.longitude
+            });
+          },
+          (error) => {
+            console.error("❌ Location error:", error.message);
+            reject(new Error("Location permission denied or unavailable."));
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 15000, // Increased timeout for high accuracy
+            maximumAge: 300000 // Accept cached location up to 5 minutes old
+          }
+        );
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+        enableHighAccuracy: false, // Start with low accuracy for speed
+        timeout: 5000, // Shorter timeout for initial attempt
+        maximumAge: 300000 // Accept cached location
       }
     );
 

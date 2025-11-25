@@ -100,7 +100,7 @@ To update models:
 2. Retrain models with updated dataset
 3. Re-export JSON rules
 4. Update edge function
-5. Deploy (automatic in Lovable)
+5. Deploy (automatic in your hosting pipeline)
 
 ## Architecture Notes
 

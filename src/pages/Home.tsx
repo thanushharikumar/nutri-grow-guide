@@ -64,7 +64,11 @@ const Home = () => {
                 </Button>
               </Link>
               <Link to="/about">
-                <Button variant="outline" size="lg" className="border-white/30 text-white hover:bg-white/10 backdrop-blur-sm">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="border-white/40 bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm"
+                >
                   Learn More
                 </Button>
               </Link>

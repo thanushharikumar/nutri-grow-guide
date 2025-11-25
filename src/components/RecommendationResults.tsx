@@ -5,7 +5,6 @@ import { Separator } from "@/components/ui/separator";
 import { 
   Leaf, 
   TrendingUp, 
-  DollarSign, 
   Calendar,
   Thermometer,
   Droplets,
@@ -26,6 +25,8 @@ interface RecommendationResultsProps {
   cropType: string;
 }
 
+const INR_EXCHANGE_RATE = 83;
+
 const RecommendationResults = ({ results, weather, cropAnalysis, cropType }: RecommendationResultsProps) => {
   const sustainabilityData = [
     { name: 'Sustainability Score', value: results.sustainabilityScore, fill: 'hsl(var(--primary))' }
@@ -36,6 +37,9 @@ const RecommendationResults = ({ results, weather, cropAnalysis, cropType }: Rec
     { name: 'Phosphorus (P₂O₅)', value: results.fertilizer.phosphorus, fill: 'hsl(var(--earth))' },
     { name: 'Potassium (K₂O)', value: results.fertilizer.potassium, fill: 'hsl(var(--primary-glow))' },
   ];
+
+  const costInINR = Math.max(0, results.costEstimate ?? 0);
+  const costInUSD = costInINR > 0 ? Math.round(costInINR / INR_EXCHANGE_RATE) : 0;
 
   const getHealthColor = (health: string) => {
     switch (health) {
@@ -102,9 +106,14 @@ const RecommendationResults = ({ results, weather, cropAnalysis, cropType }: Rec
                 <div className="text-sm text-muted-foreground">Yield Increase</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-earth mb-2">
-                  ${results.costEstimate}
+                <div className="text-3xl font-bold text-earth mb-1">
+                  ₹{costInINR.toLocaleString('en-IN')}
                 </div>
+                {costInUSD > 0 && (
+                  <div className="text-xs text-muted-foreground mb-1">
+                    ≈ ${costInUSD.toLocaleString('en-US')}
+                  </div>
+                )}
                 <div className="text-sm text-muted-foreground">Cost per Hectare</div>
               </div>
               <div className="text-center">

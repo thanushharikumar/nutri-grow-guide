@@ -76,17 +76,17 @@ const Recommendation = () => {
         console.log('🔍 Requesting location permission...');
         coordinates = await getUserLocation();
         console.log('✅ Location permission granted:', coordinates);
-        
+
         toast({
           title: "✅ Location Detected",
           description: `Found: ${coordinates.lat.toFixed(4)}°N, ${coordinates.lon.toFixed(4)}°E`,
         });
       } catch (error: any) {
         console.error('❌ Location error:', error);
-        
+
         // Use default coordinates for demonstration (New Delhi area)
         coordinates = { lat: 28.6139, lon: 77.2090 };
-        
+
         toast({
           title: "⚠️ Using Default Location",
           description: "Location access denied. Using New Delhi as default. Enable location for accurate results.",
@@ -270,7 +270,6 @@ const Recommendation = () => {
     setIsLoading(true);
     setAnalysisProgress(0);
     setResults(null);
-    setCropAnalysis(null);
     setWeatherData(null);
 
     try {
@@ -665,8 +664,8 @@ const Recommendation = () => {
                       Enter your farm's geolocation to automatically fetch soil analysis data from your Soil Health Card
                     </p>
                     <div className="flex flex-col gap-4 items-center justify-center">
-                      <Button 
-                        type="button" 
+                      <Button
+                        type="button"
                         onClick={fetchSoilData}
                         disabled={isLoadingSoilData || isLoading}
                         className="bg-earth hover:bg-earth/90 text-white"

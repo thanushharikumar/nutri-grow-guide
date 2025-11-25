@@ -229,13 +229,32 @@ const handler = async (req: Request): Promise<Response> => {
     // Ensure score stays within 0-100 range
     sustainabilityScore = Math.min(100, Math.max(0, Math.round(sustainabilityScore)));
 
-    // Calculate yield increase and cost
+    // Fetch real-time fertilizer prices in rupees with caching
+    let fertilizerPrices;
+    try {
+      const pricesResponse = await supabase.functions.invoke('get-fertilizer-prices', {});
+      fertilizerPrices = pricesResponse.data ?? null;
+    } catch (error) {
+      console.error('❌ Error fetching fertilizer prices, using defaults:', error);
+      fertilizerPrices = null;
+    }
+
+    if (!fertilizerPrices) {
+      fertilizerPrices = {
+        nitrogen: 80,
+        phosphorus: 140,
+        potassium: 62,
+        organic: 500,
+      };
+    }
+
+    // Calculate yield increase and cost in rupees
     const expectedYieldIncrease = Math.round(5 + (sustainabilityScore - 50) * 0.4);
     const costEstimate = Math.round(
-      (finalRecommendation.nitrogen * 0.8) + 
-      (finalRecommendation.phosphorus * 1.2) + 
-      (finalRecommendation.potassium * 0.6) +
-      (soilData.organicCarbon < 1.0 ? 50 : 0)
+      (finalRecommendation.nitrogen * fertilizerPrices.nitrogen) +      // ₹ per kg of N
+      (finalRecommendation.phosphorus * fertilizerPrices.phosphorus) +   // ₹ per kg of P2O5
+      (finalRecommendation.potassium * fertilizerPrices.potassium) +    // ₹ per kg of K2O
+      (soilData.organicCarbon < 1.0 ? fertilizerPrices.organic : 0)    // ₹ per hectare if OC < 1%
     );
 
     const result = {
